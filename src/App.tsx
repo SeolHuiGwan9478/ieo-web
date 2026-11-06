@@ -4,6 +4,15 @@ import { AppLayout } from './layout/AppLayout'
 import { LoginPage } from './pages/LoginPage'
 import { CompanyRegisterPage } from './pages/CompanyRegisterPage'
 import { HomePage } from './pages/HomePage'
+import { OrdersPage } from './pages/orders/OrdersPage'
+import { OrderNewPage } from './pages/orders/OrderNewPage'
+import { OrderDetailPage } from './pages/orders/OrderDetailPage'
+import { TripsPage } from './pages/trips/TripsPage'
+import { TripDetailPage } from './pages/trips/TripDetailPage'
+import { DriversPage } from './pages/DriversPage'
+import { MembersPage } from './pages/MembersPage'
+import { ReportsPage } from './pages/ReportsPage'
+import { SettingsPage } from './pages/SettingsPage'
 
 /** 로그인 안 했으면 로그인으로, 소속 회사가 없으면 회사 등록으로 */
 function RequireCompany() {
@@ -46,6 +55,15 @@ export default function App() {
       </Route>
       <Route element={<RequireCompany />}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/orders" element={<OrdersPage />} />
+        <Route path="/orders/new" element={<OrderNewPage />} />
+        <Route path="/orders/:orderId" element={<OrderDetailPage />} />
+        <Route path="/trips" element={<TripsPage />} />
+        <Route path="/trips/:tripId" element={<TripDetailPage />} />
+        <Route path="/drivers" element={<DriversPage />} />
+        <Route path="/members" element={<MembersPage />} />
+        <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
