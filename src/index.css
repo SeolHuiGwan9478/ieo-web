@@ -27,6 +27,41 @@
   --color-status-red: #B91C1C;
   --color-status-red-bg: #FDECEC;
 
+  /*
+   * shadcn 컴포넌트(src/components/ui/)가 쓰는 색 이름을 브랜드 색에 연결한다.
+   * 가져온 컴포넌트는 코드를 고치지 않아도 이에오 색으로 보인다
+   */
+  --color-background: #FFFFFF;
+  --color-foreground: var(--color-ink-strong);
+  --color-primary: var(--color-orange-600);
+  --color-primary-foreground: #FFFFFF;
+  --color-muted: var(--color-canvas);
+  --color-muted-foreground: var(--color-ink-mid);
+  --color-accent: var(--color-canvas);
+  --color-accent-foreground: var(--color-ink-strong);
+  --color-secondary: var(--color-canvas);
+  --color-secondary-foreground: var(--color-ink-strong);
+  --color-destructive: var(--color-status-red);
+  --color-destructive-foreground: #FFFFFF;
+  --color-border: #D9DEE3;
+  --color-input: #D9DEE3;
+  --color-ring: var(--color-orange-700);
+
+  /* 페이지가 열릴 때의 등장 모션. animate-rise(아래에서 떠오름), animate-drop(위에서 내려옴) */
+  --animate-rise: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-drop: drop 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  --animate-marquee: marquee 30s linear infinite;
+  @keyframes marquee { to { transform: translateX(-50%); } }
+  --animate-fade: fade 0.7s ease-in-out both;
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  /* 카드 속 그림의 잔잔한 움직임: 위아래로 떠다님, 선을 따라 흐르는 점선 */
+  --animate-bob: bob 3.2s ease-in-out infinite;
+  --animate-flow: flow 1.4s linear infinite;
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+  @keyframes flow { to { stroke-dashoffset: -20; } }
+  @keyframes drop { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto,
     "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
 }

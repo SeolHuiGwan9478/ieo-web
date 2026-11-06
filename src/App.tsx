@@ -1,6 +1,7 @@
 import { Navigate, Outlet, Route, Routes } from 'react-router'
 import { useAuth } from './auth/AuthContext'
 import { AppLayout } from './layout/AppLayout'
+import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
 import { CompanyRegisterPage } from './pages/CompanyRegisterPage'
 import { HomePage } from './pages/HomePage'
@@ -47,6 +48,8 @@ export function FullPageMessage({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <Routes>
+      <Route path="/landing" element={<LandingPage lang="ko" />} />
+      <Route path="/landing/en" element={<LandingPage lang="en" />} />
       <Route element={<PublicOnly />}>
         <Route path="/login" element={<LoginPage />} />
       </Route>
