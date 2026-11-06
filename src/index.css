@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+/*
+ * 이에오 브랜드 색 (ieo-app/design/README.md).
+ * 주황은 로고·주요 버튼·선택된 메뉴에만, 운행 상태는 신호등(파랑·노랑·초록·빨강).
+ * Tailwind 유틸로 bg-orange-600, text-ink-strong, bg-status-blue 처럼 쓴다
+ */
+@theme {
+  --color-orange-50: #FFF3EE;
+  --color-orange-100: #FFE2D6;
+  --color-orange-500: #FF6C37;
+  --color-orange-600: #F25A22;
+  --color-orange-700: #C2410C;
+
+  --color-canvas: #F2F4F6;
+  --color-line: #EDEDED;
+  --color-ink-strong: #191F28;
+  --color-ink-mid: #4E5968;
+  --color-ink-sub: #8B95A1;
+
+  --color-status-blue: #1D4ED8;
+  --color-status-blue-bg: #E8EFFD;
+  --color-status-yellow: #A16207;
+  --color-status-yellow-bg: #FEF9C3;
+  --color-status-green: #15803D;
+  --color-status-green-bg: #DCFCE7;
+  --color-status-red: #B91C1C;
+  --color-status-red-bg: #FDECEC;
+
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto,
+    "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+}
+
+html {
+  background: var(--color-canvas);
+  color: var(--color-ink-strong);
+}
