@@ -31,12 +31,13 @@ function CompanyCard({ isOwner }: { isOwner: boolean }) {
   const { me, refreshMe } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
-  const { register, handleSubmit, formState } = useForm<{ name: string; licenseNumber: string; representativeName: string; settlementDays: string }>({
-    defaultValues: { name: me!.name, licenseNumber: me!.licenseNumber, representativeName: me!.representativeName ?? '', settlementDays: String(me!.settlementDays) },
+  type CompanyForm = { name: string; licenseNumber: string; representativeName: string; settlementDays: string; defaultFeeRate: string }
+  const { register, handleSubmit, formState } = useForm<CompanyForm>({
+    defaultValues: { name: me!.name, licenseNumber: me!.licenseNumber, representativeName: me!.representativeName ?? '', settlementDays: String(me!.settlementDays), defaultFeeRate: String(me!.defaultFeeRate) },
   })
   const update = useMutation({
-    mutationFn: (v: { name: string; licenseNumber: string; representativeName: string; settlementDays: string }) =>
-      brokerApi.update({ name: v.name.trim(), licenseNumber: v.licenseNumber.trim(), representativeName: v.representativeName.trim() || undefined, settlementDays: Number(v.settlementDays) }),
+    mutationFn: (v: CompanyForm) =>
+      brokerApi.update({ name: v.name.trim(), licenseNumber: v.licenseNumber.trim(), representativeName: v.representativeName.trim() || undefined, settlementDays: Number(v.settlementDays), defaultFeeRate: Number(v.defaultFeeRate) }),
     onSuccess: () => {
       setError(null)
       setSaved(true)
@@ -60,6 +61,17 @@ function CompanyCard({ isOwner }: { isOwner: boolean }) {
           hint="인수증 결제 운임을 인수증 전달 뒤 며칠 안에 지급하는지. 오더의 지급 예정일 기본값이자 차주 장부의 지급 예정일이 돼요."
           error={formState.errors.settlementDays?.message}
           {...register('settlementDays', { required: true, min: { value: 0, message: '0~365일' }, max: { value: 365, message: '0~365일' } })}
+        />
+        <Field
+          label="기본 수수료율 (%)"
+          type="number"
+          min={0}
+          max={99.9}
+          step={0.1}
+          disabled={!isOwner}
+          hint="오더를 올릴 때 지급운임에서 청구운임을 미리 계산해 줘요. 수수료율 = 수수료 ÷ 청구운임 (화주 계약 금액 기준). 0이면 계산하지 않아요."
+          error={formState.errors.defaultFeeRate?.message}
+          {...register('defaultFeeRate', { required: true, min: { value: 0, message: '0~99.9%' }, max: { value: 99.9, message: '0~99.9%' } })}
         />
         <ErrorText>{error}</ErrorText>
         {isOwner ? (

@@ -101,7 +101,13 @@ export function TripDetailPage() {
                 },
                 { label: '연락처', value: t.driverPhone ? <a href={`tel:${t.driverPhone}`} className="text-orange-700">{formatPhone(t.driverPhone)}</a> : <span className="text-ink-sub">단골에게만 보여요</span> },
                 { label: '차량', value: `${t.plateNumber} · ${t.tonnageLabel}` },
-                { label: '운임', value: `${formatWon(t.fare)} · ${t.paymentTypeLabel}` },
+                { label: '지급운임 (차주)', value: `${formatWon(t.fare)} · ${t.paymentTypeLabel}` },
+                ...(t.billedFare !== null
+                  ? [
+                      { label: '청구운임 (화주)', value: formatWon(t.billedFare) },
+                      { label: '수수료', value: `${formatWon(t.fee)} · ${t.feeRate}%` },
+                    ]
+                  : []),
               ]}
             />
           </Card>

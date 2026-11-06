@@ -20,6 +20,17 @@ export interface OrderSite {
   lng: number
 }
 
+/** 화주 쪽 숫자. 주선사만 본다 (차주 응답에는 없다). 청구운임을 안 적었으면 billedFare·fee·feeRate가 null */
+export interface Billing {
+  customerName: string | null
+  /** 청구운임(화주에게 받는 돈) */
+  billedFare: number | null
+  /** 수수료 = 청구운임 − 지급운임 */
+  fee: number | null
+  /** 수수료율(%) = 수수료 ÷ 청구운임 */
+  feeRate: number | null
+}
+
 /** 주선사 오더 (서버 OrderResponse) */
 export interface Order {
   id: number
@@ -42,6 +53,7 @@ export interface Order {
   bodyTypeLabel: string
   loadingMethod: LoadingMethod
   loadingMethodLabel: string
+  /** 지급운임 (차주에게 주는 돈) */
   fare: number
   paymentType: PaymentType
   paymentTypeLabel: string
@@ -51,6 +63,7 @@ export interface Order {
   targetDriverId: number | null
   createdAt: string
   pendingRequestCount: number | null
+  billing: Billing | null
 }
 
 export interface OrderPage {
@@ -92,7 +105,13 @@ export interface CreateOrderRequest {
   tonnage: Tonnage
   bodyType: BodyType
   loadingMethod: LoadingMethod
+  /** 지급운임 (차주) */
   fare: number
+  /** 청구운임 (화주). 비우고 feeRate를 주면 서버가 지급운임에서 계산한다 */
+  billedFare?: number | null
+  /** 수수료율(%). billedFare가 있으면 무시 */
+  feeRate?: number | null
+  customerName?: string | null
   paymentType: PaymentType
   expectedPaymentDays?: number | null
   consignmentType: ConsignmentType
@@ -111,4 +130,16 @@ export const ordersApi = {
   cancel: (orderId: number, body: { reason: CancelReason; memo?: string; reopen: boolean }) =>
     api<Order>(`/api/broker/orders/${orderId}/cancel`, { method: 'POST', body }),
   close: (orderId: number) => api<Order>(`/api/broker/orders/${orderId}/close`, { method: 'POST' }),
+}
+
+/** 수수료율(%)로 청구운임 계산: 지급운임 ÷ (1 − 율), 1,000원 단위 반올림. 서버 Order.billedFareFor와 같은 식 */
+export function billedFareFor(fare: number, feeRate: number) {
+  if (!Number.isFinite(fare) || !Number.isFinite(feeRate) || feeRate < 0 || feeRate >= 100) return null
+  return Math.round(fare / (1 - feeRate / 100) / 1000) * 1000
+}
+
+/** 수수료율(%) = (청구 − 지급) ÷ 청구, 소수 첫째 자리 */
+export function feeRateOf(fare: number, billedFare: number) {
+  if (!billedFare) return null
+  return Math.round(((billedFare - fare) / billedFare) * 1000) / 10
 }

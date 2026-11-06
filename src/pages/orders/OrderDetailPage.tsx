@@ -120,7 +120,22 @@ export function OrderDetailPage() {
                 { label: '무게', value: `${o.weightKg.toLocaleString()}kg` },
                 { label: '차량', value: `${o.tonnageLabel} ${o.bodyTypeLabel}` },
                 { label: '상하차', value: o.loadingMethodLabel },
-                { label: '운임', value: <span className="text-[16px] font-bold">{formatWon(o.fare)}</span> },
+                { label: '지급운임 (차주)', value: <span className="text-[16px] font-bold">{formatWon(o.fare)}</span> },
+                ...(o.billing?.billedFare !== null && o.billing?.billedFare !== undefined
+                  ? [
+                      { label: '청구운임 (화주)', value: <span className="text-[16px] font-bold">{formatWon(o.billing.billedFare)}</span> },
+                      {
+                        label: '수수료',
+                        value: (
+                          <span className={o.billing.fee! < 0 ? 'text-status-red' : ''}>
+                            {formatWon(o.billing.fee)} · {o.billing.feeRate}%
+                            <span className="ml-2 text-[12px] font-normal text-ink-sub">차주에게는 안 보여요</span>
+                          </span>
+                        ),
+                      },
+                    ]
+                  : [{ label: '청구운임 (화주)', value: <span className="text-ink-sub">안 적음</span> }]),
+                { label: '거래처', value: o.billing?.customerName ?? <span className="text-ink-sub">-</span> },
                 { label: '결제', value: o.paymentType === 'RECEIPT' ? `${o.paymentTypeLabel} · 전달 뒤 ${o.expectedPaymentDays}일` : o.paymentTypeLabel },
                 { label: '운송 형태', value: CONSIGNMENT[o.consignmentType] },
                 { label: '배차', value: o.targetDriverId ? '단골 차주 지정' : CONFIRM_MODE[o.confirmMode] },

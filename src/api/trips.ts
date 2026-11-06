@@ -56,7 +56,12 @@ export interface Trip {
   location: { lat: number; lng: number; recordedAt: string } | null
   etaAt: string | null
   progressPercent: number | null
+  /** 지급운임 (차주) */
   fare: number
+  /** 청구운임·수수료·수수료율. 오더에 청구운임을 적었을 때만 */
+  billedFare: number | null
+  fee: number | null
+  feeRate: number | null
   paymentType: PaymentType
   paymentTypeLabel: string
   pickup: TripStop

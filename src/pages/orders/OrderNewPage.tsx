@@ -1,14 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
-import { ordersApi, type CreateOrderRequest, type OrderSite } from '../../api/orders'
+import { billedFareFor, feeRateOf, ordersApi, type CreateOrderRequest, type OrderSite } from '../../api/orders'
 import { driversApi } from '../../api/people'
 import { ApiError } from '../../api/client'
 import { BODY_TYPES, CARGO_CATEGORIES, CONFIRM_MODE, CONSIGNMENT, LOADING_METHODS, PAYMENT_TYPES, TONNAGES } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
 import { Button, Card, ErrorText, Field, PageHeader, SelectField } from '../../components/ui'
-import { localInputToIso, localInputValue } from '../../lib/format'
+import { formatWon, localInputToIso, localInputValue } from '../../lib/format'
 
 /**
  * 오더 등록 (DSP-001). 필수 항목을 다 적어야 등록된다.
@@ -35,6 +35,9 @@ interface FormValues {
   bodyType: CreateOrderRequest['bodyType']
   loadingMethod: CreateOrderRequest['loadingMethod']
   fare: string
+  feeRate: string
+  billedFare: string
+  customerName: string
   paymentType: CreateOrderRequest['paymentType']
   expectedPaymentDays: string
   consignmentType: CreateOrderRequest['consignmentType']
@@ -74,6 +77,9 @@ export function OrderNewPage() {
       bodyType: 'CARGO',
       loadingMethod: 'FORKLIFT',
       paymentType: 'RECEIPT',
+      feeRate: me?.defaultFeeRate ? String(me.defaultFeeRate) : '',
+      billedFare: '',
+      customerName: '',
       expectedPaymentDays: String(me?.settlementDays ?? 30),
       consignmentType: 'DIRECT',
       confirmMode: 'SELECT',
@@ -84,6 +90,19 @@ export function OrderNewPage() {
   const dropoffPreset = watch('dropoffPreset')
   const paymentType = watch('paymentType')
   const targetDriverId = watch('targetDriverId')
+  const fare = watch('fare')
+  const feeRate = watch('feeRate')
+  const billedFare = watch('billedFare')
+
+  // 지급운임·수수료율을 적으면 청구운임을 채운다. 청구운임을 직접 고친 뒤에는 건드리지 않는다
+  const [billedTouched, setBilledTouched] = useState(false)
+  useEffect(() => {
+    if (billedTouched || feeRate === '') return
+    const computed = billedFareFor(Number(fare), Number(feeRate))
+    setValue('billedFare', computed === null || fare === '' ? '' : String(computed))
+  }, [fare, feeRate, billedTouched, setValue])
+  const fee = billedFare !== '' && fare !== '' ? Number(billedFare) - Number(fare) : null
+  const actualFeeRate = fee === null ? null : feeRateOf(Number(fare), Number(billedFare))
 
   const applyPreset = (prefix: 'pickup' | 'dropoff', id: string) => {
     const site = sites.find((s) => String(s.id) === id)
@@ -133,6 +152,9 @@ export function OrderNewPage() {
       bodyType: v.bodyType,
       loadingMethod: v.loadingMethod,
       fare: Number(v.fare),
+      billedFare: v.billedFare !== '' ? Number(v.billedFare) : null,
+      feeRate: v.billedFare === '' && v.feeRate !== '' ? Number(v.feeRate) : null,
+      customerName: v.customerName.trim() || null,
       paymentType: v.paymentType,
       expectedPaymentDays: v.paymentType === 'RECEIPT' && v.expectedPaymentDays !== '' ? Number(v.expectedPaymentDays) : null,
       consignmentType: v.consignmentType,
@@ -206,7 +228,30 @@ export function OrderNewPage() {
 
         <Card title="운임과 결제">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="운임 (원)" required inputMode="numeric" placeholder="450000" error={formState.errors.fare?.message} {...num('fare', '운임', { min: 0, max: 100_000_000 })} />
+            <Field label="지급운임 (원, 차주에게)" required inputMode="numeric" placeholder="450000" hint="차주 화면에 보이는 운임이에요." error={formState.errors.fare?.message} {...num('fare', '지급운임', { min: 0, max: 100_000_000 })} />
+            <Field
+              label="수수료율 (%)"
+              type="number"
+              min={0}
+              max={99.9}
+              step={0.1}
+              placeholder="10"
+              hint="적으면 청구운임을 계산해 채워요. 수수료율 = 수수료 ÷ 청구운임."
+              error={formState.errors.feeRate?.message}
+              {...register('feeRate', { onChange: () => setBilledTouched(false), min: { value: 0, message: '0~99.9%' }, max: { value: 99.9, message: '0~99.9%' } })}
+            />
+            <Field
+              label="청구운임 (원, 화주에게)"
+              inputMode="numeric"
+              placeholder="600000"
+              hint={fee !== null ? `수수료 ${formatWon(fee)}${actualFeeRate !== null ? ` · ${actualFeeRate}%` : ''}${fee < 0 ? ' — 지급운임보다 적어요' : ''}` : '비우면 수수료를 계산하지 않아요. 차주에게는 안 보여요.'}
+              error={formState.errors.billedFare?.message}
+              {...register('billedFare', {
+                onChange: () => setBilledTouched(true),
+                validate: (val) => val === '' || (!Number.isNaN(Number(val)) && Number(val) >= 0 && Number(val) <= 100_000_000) || '0 이상 숫자로 입력해 주세요.',
+              })}
+            />
+            <Field label="거래처 (화주)" placeholder="대한제강" maxLength={50} hint="주선사만 봐요." error={formState.errors.customerName?.message} {...register('customerName')} />
             <SelectField label="결제 방식" required options={PAYMENT_TYPES.map((p) => ({ value: p.value, label: `${p.label} — ${p.hint}` }))} {...register('paymentType')} />
             {paymentType === 'RECEIPT' ? (
               <Field label="지급 예정 (인수증 전달 뒤 일수)" inputMode="numeric" hint={`비우면 회사 정산 주기 ${me?.settlementDays ?? 30}일`} error={formState.errors.expectedPaymentDays?.message} {...register('expectedPaymentDays')} />

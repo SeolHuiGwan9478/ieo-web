@@ -20,6 +20,8 @@ export interface MyBroker {
   licenseNumber: string
   representativeName: string | null
   settlementDays: number
+  /** 기본 수수료율(%). 오더 폼의 수수료율 기본값. 0이면 자동 계산 안 함 */
+  defaultFeeRate: number
   position: MemberPosition
   positionLabel: string
   plan: PlanInfo
@@ -32,6 +34,7 @@ export interface CreateBrokerRequest {
   licenseNumber: string
   representativeName?: string
   settlementDays?: number
+  defaultFeeRate?: number
 }
 
 export const brokerApi = {

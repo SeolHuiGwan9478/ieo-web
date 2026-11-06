@@ -72,7 +72,20 @@ export function OrdersPage() {
                 },
                 { key: 'when', header: '상차', cell: (o) => <span className="tabular-nums">{formatDateTime(o.pickupFrom)}</span> },
                 { key: 'vehicle', header: '차량', cell: (o) => `${o.tonnageLabel} ${o.bodyTypeLabel}` },
-                { key: 'fare', header: '운임', align: 'right', cell: (o) => <span className="font-semibold">{formatWon(o.fare)}</span> },
+                { key: 'fare', header: '지급운임', align: 'right', cell: (o) => <span className="font-semibold">{formatWon(o.fare)}</span> },
+                {
+                  key: 'fee',
+                  header: '수수료',
+                  align: 'right',
+                  cell: (o) =>
+                    o.billing?.fee !== null && o.billing?.fee !== undefined ? (
+                      <span className="tabular-nums">
+                        {formatWon(o.billing.fee)} <span className="text-[12px] text-ink-sub">{o.billing.feeRate}%</span>
+                      </span>
+                    ) : (
+                      <span className="text-ink-sub">-</span>
+                    ),
+                },
                 { key: 'pay', header: '결제', cell: (o) => o.paymentTypeLabel },
                 {
                   key: 'req',
