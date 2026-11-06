@@ -140,6 +140,47 @@ export function TextareaField({ label, error, hint, className = '', ...rest }: T
   )
 }
 
+/** 고를 것이 몇 개 안 될 때 드롭다운 대신 쓰는 칩. 고른 것만 주황 테두리 */
+export function ChipGroup<T extends string>({ label, value, onChange, options, hint, error, required, className = '' }: {
+  label: string
+  value: T
+  onChange: (v: T) => void
+  options: { value: T; label: string }[]
+  hint?: string
+  error?: string
+  required?: boolean
+  className?: string
+}) {
+  return (
+    <div className={className} role="group" aria-label={label}>
+      <span className="mb-1.5 flex items-center gap-1 text-[13px] font-semibold text-ink-mid">
+        {label}
+        {required ? <span className="text-orange-600">*</span> : null}
+      </span>
+      <div className="flex flex-wrap gap-2">
+        {options.map((o) => {
+          const active = o.value === value
+          return (
+            <button
+              key={o.value}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onChange(o.value)}
+              className={`h-10 rounded-xl border px-3.5 text-[14px] font-semibold transition ${
+                active ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-line bg-white text-ink-mid hover:bg-canvas'
+              }`}
+            >
+              {o.label}
+            </button>
+          )
+        })}
+      </div>
+      {error ? <span className="mt-1 block text-[12.5px] text-status-red">{error}</span> : null}
+      {!error && hint ? <span className="mt-1 block text-[12.5px] text-ink-sub">{hint}</span> : null}
+    </div>
+  )
+}
+
 /** 오류 문구 (서버 message를 그대로) */
 export function ErrorText({ children }: { children: ReactNode }) {
   if (!children) return null

@@ -2,31 +2,55 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
-import { billedFareFor, feeRateOf, ordersApi, type CreateOrderRequest, type OrderSite } from '../../api/orders'
+import { fareFor, feeRateOf, ordersApi, type CreateOrderRequest, type OrderSite } from '../../api/orders'
 import { driversApi } from '../../api/people'
 import { ApiError } from '../../api/client'
 import { BODY_TYPES, CARGO_CATEGORIES, CONFIRM_MODE, CONSIGNMENT, LOADING_METHODS, PAYMENT_TYPES, TONNAGES } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
-import { Button, Card, ErrorText, Field, PageHeader, SelectField } from '../../components/ui'
-import { formatWon, localInputToIso, localInputValue } from '../../lib/format'
+import { Button, Card, ChipGroup, ErrorText, Field, PageHeader, SelectField } from '../../components/ui'
+import { formatDateTime, formatWon, localInputValue } from '../../lib/format'
 
 /**
- * 오더 등록 (DSP-001). 필수 항목을 다 적어야 등록된다.
- * 상하차지는 이전에 쓴 곳을 고르거나 새로 적는다 (좌표는 아직 직접 입력. 지도·주소 검색은 보류)
+ * 오더 등록 (DSP-001). 서버가 요구하는 항목은 그대로 두고 타이핑을 줄인다.
+ * - 상하차지: 이전에 쓴 곳을 고르면 끝. 새 곳만 이름·주소·좌표를 적는다 (주소 검색은 아직 없음)
+ * - 시간: 상차 날짜·시각 하나와 "상차 가능 폭", "하차 기한"을 고르면 세 시각이 계산된다
+ * - 운임: 주선사가 일하는 순서대로. 화주 계약가(청구운임)와 수수료율을 적으면 차주 지급운임이 채워진다. 지급운임만 적어도 된다
+ * - 결제·운송 형태·확정 방식·거래처: 회사 기본값으로 접어 둔다
  */
+const NEW_SITE = 'new'
+type PickupWindow = 'EXACT' | 'HOURS_2' | 'SAME_DAY'
+type DropoffDeadline = 'SAME_DAY' | 'NEXT_MORNING' | 'CUSTOM'
+
+const PICKUP_WINDOWS: { value: PickupWindow; label: string }[] = [
+  { value: 'EXACT', label: '정시' },
+  { value: 'HOURS_2', label: '2시간 안' },
+  { value: 'SAME_DAY', label: '당일 아무 때나' },
+]
+const DROPOFF_DEADLINES: { value: DropoffDeadline; label: string }[] = [
+  { value: 'SAME_DAY', label: '당일' },
+  { value: 'NEXT_MORNING', label: '다음날 오전 9시' },
+  { value: 'CUSTOM', label: '직접 정하기' },
+]
+
 interface FormValues {
-  pickupPreset: string
+  /** 저장된 상하차지 id. NEW_SITE면 새로 적는다 */
+  pickupSite: string
   pickupName: string
   pickupAddress: string
   pickupLat: string
   pickupLng: string
-  dropoffPreset: string
+  dropoffSite: string
   dropoffName: string
   dropoffAddress: string
   dropoffLat: string
   dropoffLng: string
-  pickupFrom: string
-  pickupUntil: string
+  /** YYYY-MM-DD */
+  pickupDate: string
+  /** HH:mm */
+  pickupTime: string
+  pickupWindow: PickupWindow
+  dropoffDeadline: DropoffDeadline
+  /** 하차 기한을 직접 정할 때만 (datetime-local) */
   dropoffBy: string
   cargoCategory: CreateOrderRequest['cargoCategory']
   cargoType: string
@@ -34,9 +58,11 @@ interface FormValues {
   tonnage: CreateOrderRequest['tonnage']
   bodyType: CreateOrderRequest['bodyType']
   loadingMethod: CreateOrderRequest['loadingMethod']
-  fare: string
-  feeRate: string
+  /** 청구운임 (화주와 계약한 금액). 비워도 된다 */
   billedFare: string
+  feeRate: string
+  /** 지급운임 (차주에게). 차주 화면에 보인다 */
+  fare: string
   customerName: string
   paymentType: CreateOrderRequest['paymentType']
   expectedPaymentDays: string
@@ -45,11 +71,49 @@ interface FormValues {
   targetDriverId: string
 }
 
+type SitePrefix = 'pickup' | 'dropoff'
+
+/** 상차 시작·마감. 정시는 30분 폭, 당일은 자정 직전까지. 날짜나 시각이 비어 있으면 null */
+function pickupRange(date: string, time: string, window: PickupWindow): { from: Date; until: Date } | null {
+  if (!date || !time) return null
+  const from = new Date(`${date}T${time}`)
+  if (Number.isNaN(from.getTime())) return null
+  const until = new Date(from)
+  if (window === 'EXACT') until.setMinutes(until.getMinutes() + 30)
+  else if (window === 'HOURS_2') until.setHours(until.getHours() + 2)
+  else until.setHours(23, 59, 0, 0)
+  return { from, until }
+}
+
+/** 하차 기한. 당일은 상차일 자정 직전, 다음날은 오전 9시, 직접 정하면 적은 시각 */
+function dropoffDeadlineAt(from: Date, deadline: DropoffDeadline, custom: string): Date | null {
+  if (deadline === 'CUSTOM') {
+    if (!custom) return null
+    const d = new Date(custom)
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+  const d = new Date(from)
+  if (deadline === 'SAME_DAY') d.setHours(23, 59, 0, 0)
+  else {
+    d.setDate(d.getDate() + 1)
+    d.setHours(9, 0, 0, 0)
+  }
+  return d
+}
+
+/** 지금부터 2시간 뒤를 30분 단위로 올린 시각 */
+function defaultPickupStart() {
+  const d = new Date(Date.now() + 2 * 3600_000)
+  d.setMinutes(d.getMinutes() + ((30 - (d.getMinutes() % 30)) % 30), 0, 0)
+  return d
+}
+
 export function OrderNewPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { me } = useAuth()
   const [error, setError] = useState<string | null>(null)
+  const [advancedOpen, setAdvancedOpen] = useState(false)
 
   // 이전 오더의 상하차지를 고를 수 있게
   const recent = useQuery({ queryKey: ['orders', { status: '', page: 0, size: 50 }], queryFn: () => ordersApi.list({ status: '', page: 0, size: 50 }) })
@@ -62,56 +126,103 @@ export function OrderNewPage() {
     })
     return [...map.values()]
   }, [recent.data])
+  /** 저장된 곳이 하나도 없으면 고를 것 없이 바로 적는다 */
+  const isNewSite = (chosen: string) => sites.length === 0 || chosen === NEW_SITE
 
-  const now = new Date()
-  const in2h = new Date(now.getTime() + 2 * 3600_000)
+  const start = useMemo(defaultPickupStart, [])
   const { register, handleSubmit, watch, setValue, formState, setError: setFieldError } = useForm<FormValues>({
     defaultValues: {
-      pickupPreset: '',
-      dropoffPreset: '',
-      pickupFrom: localInputValue(in2h),
-      pickupUntil: localInputValue(new Date(in2h.getTime() + 2 * 3600_000)),
-      dropoffBy: localInputValue(new Date(in2h.getTime() + 8 * 3600_000)),
+      pickupSite: '',
+      pickupName: '',
+      pickupAddress: '',
+      pickupLat: '',
+      pickupLng: '',
+      dropoffSite: '',
+      dropoffName: '',
+      dropoffAddress: '',
+      dropoffLat: '',
+      dropoffLng: '',
+      pickupDate: localInputValue(start).slice(0, 10),
+      pickupTime: localInputValue(start).slice(11, 16),
+      pickupWindow: 'HOURS_2',
+      dropoffDeadline: 'SAME_DAY',
+      dropoffBy: '',
       cargoCategory: 'GENERAL',
+      cargoType: '',
+      weightKg: '',
       tonnage: 'TON_5',
       bodyType: 'CARGO',
       loadingMethod: 'FORKLIFT',
-      paymentType: 'RECEIPT',
-      feeRate: me?.defaultFeeRate ? String(me.defaultFeeRate) : '',
       billedFare: '',
+      feeRate: me?.defaultFeeRate ? String(me.defaultFeeRate) : '',
+      fare: '',
       customerName: '',
+      paymentType: 'RECEIPT',
       expectedPaymentDays: String(me?.settlementDays ?? 30),
       consignmentType: 'DIRECT',
       confirmMode: 'SELECT',
       targetDriverId: '',
     },
   })
-  const pickupPreset = watch('pickupPreset')
-  const dropoffPreset = watch('dropoffPreset')
-  const paymentType = watch('paymentType')
-  const targetDriverId = watch('targetDriverId')
-  const fare = watch('fare')
-  const feeRate = watch('feeRate')
+  const pickupSite = watch('pickupSite')
+  const dropoffSite = watch('dropoffSite')
+  const pickupDate = watch('pickupDate')
+  const pickupTime = watch('pickupTime')
+  const pickupWindow = watch('pickupWindow')
+  const deadlineChoice = watch('dropoffDeadline')
+  const dropoffBy = watch('dropoffBy')
+  const cargoCategory = watch('cargoCategory')
   const billedFare = watch('billedFare')
+  const feeRate = watch('feeRate')
+  const fare = watch('fare')
+  const paymentType = watch('paymentType')
+  const expectedPaymentDays = watch('expectedPaymentDays')
+  const consignmentType = watch('consignmentType')
+  const confirmMode = watch('confirmMode')
+  const targetDriverId = watch('targetDriverId')
+  const customerName = watch('customerName')
+  const errorOf = (field: keyof FormValues) => formState.errors[field]?.message
 
-  // 지급운임·수수료율을 적으면 청구운임을 채운다. 청구운임을 직접 고친 뒤에는 건드리지 않는다
-  const [billedTouched, setBilledTouched] = useState(false)
+  // 청구운임과 수수료율을 적으면 지급운임을 채운다. 지급운임을 직접 고친 뒤에는 건드리지 않는다
+  const [fareTouched, setFareTouched] = useState(false)
   useEffect(() => {
-    if (billedTouched || feeRate === '') return
-    const computed = billedFareFor(Number(fare), Number(feeRate))
-    setValue('billedFare', computed === null || fare === '' ? '' : String(computed))
-  }, [fare, feeRate, billedTouched, setValue])
+    if (fareTouched || billedFare === '' || feeRate === '') return
+    const computed = fareFor(Number(billedFare), Number(feeRate))
+    setValue('fare', computed === null ? '' : String(computed), { shouldValidate: formState.isSubmitted })
+  }, [billedFare, feeRate, fareTouched, setValue, formState.isSubmitted])
   const fee = billedFare !== '' && fare !== '' ? Number(billedFare) - Number(fare) : null
   const actualFeeRate = fee === null ? null : feeRateOf(Number(fare), Number(billedFare))
+  const fareHint =
+    fee !== null
+      ? fee < 0
+        ? '청구운임보다 많아요. 수수료가 마이너스예요.'
+        : `수수료 ${formatWon(fee)}${actualFeeRate !== null ? ` · ${actualFeeRate}%` : ''}. 차주 화면에는 지급운임만 보여요.`
+      : feeRate !== ''
+        ? `청구운임을 비우면 수수료율 ${feeRate}%로 청구운임을 어림해 적어 둬요.`
+        : '차주 화면에 보이는 금액이에요.'
 
-  const applyPreset = (prefix: 'pickup' | 'dropoff', id: string) => {
-    const site = sites.find((s) => String(s.id) === id)
-    if (!site) return
-    setValue(`${prefix}Name`, site.name)
-    setValue(`${prefix}Address`, site.address)
-    setValue(`${prefix}Lat`, String(site.lat))
-    setValue(`${prefix}Lng`, String(site.lng))
-  }
+  // 냉동·냉장 화물은 차종도 냉동·냉장이어야 서버가 받는다
+  useEffect(() => {
+    if (cargoCategory === 'COLD') setValue('bodyType', 'REFRIGERATED')
+  }, [cargoCategory, setValue])
+
+  const range = pickupRange(pickupDate, pickupTime, pickupWindow)
+  const deadline = range ? dropoffDeadlineAt(range.from, deadlineChoice, dropoffBy) : null
+  const timeSummary = range
+    ? `${formatDateTime(range.from.toISOString())}부터 ${formatDateTime(range.until.toISOString())}까지 상차${
+        deadline ? ` · ${formatDateTime(deadline.toISOString())}까지 하차` : ''
+      }`
+    : null
+
+  const paymentLabel = PAYMENT_TYPES.find((p) => p.value === paymentType)?.label ?? ''
+  const advancedSummary = [
+    paymentType === 'RECEIPT' ? `${paymentLabel} · 전달 뒤 ${expectedPaymentDays || me?.settlementDays || 30}일 지급` : paymentLabel,
+    CONSIGNMENT[consignmentType],
+    targetDriverId ? '단골 차주 지정' : `마켓 공개 · ${CONFIRM_MODE[confirmMode]}`,
+    customerName ? `거래처 ${customerName}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   const create = useMutation({
     mutationFn: (body: CreateOrderRequest) => ordersApi.create(body),
@@ -127,24 +238,25 @@ export function OrderNewPage() {
     },
   })
 
-  const siteInput = (prefix: 'pickup' | 'dropoff', v: FormValues) => {
-    const preset = prefix === 'pickup' ? v.pickupPreset : v.dropoffPreset
-    const site = { name: v[`${prefix}Name`].trim(), address: v[`${prefix}Address`].trim(), lat: Number(v[`${prefix}Lat`]), lng: Number(v[`${prefix}Lng`]) }
-    const presetSite = sites.find((s) => String(s.id) === preset)
-    // 고른 곳에서 이름·주소·좌표를 안 바꿨으면 그 id로, 바꿨으면 새 상하차지
-    if (presetSite && presetSite.name === site.name && presetSite.address === site.address && presetSite.lat === site.lat && presetSite.lng === site.lng) {
-      return { siteId: presetSite.id }
-    }
-    return { site }
+  const siteInput = (prefix: SitePrefix, v: FormValues) => {
+    const chosen = v[`${prefix}Site`]
+    if (!isNewSite(chosen)) return { siteId: Number(chosen) }
+    return { site: { name: v[`${prefix}Name`].trim(), address: v[`${prefix}Address`].trim(), lat: Number(v[`${prefix}Lat`]), lng: Number(v[`${prefix}Lng`]) } }
   }
 
-  const onSubmit = (v: FormValues) =>
+  const onSubmit = (v: FormValues) => {
+    const pickup = pickupRange(v.pickupDate, v.pickupTime, v.pickupWindow)
+    if (!pickup) return setFieldError('pickupTime', { message: '상차 날짜와 시각을 골라 주세요.' })
+    if (pickup.until <= pickup.from) return setFieldError('pickupTime', { message: '당일 상차는 자정 전 시각이어야 해요.' })
+    const by = dropoffDeadlineAt(pickup.from, v.dropoffDeadline, v.dropoffBy)
+    if (!by) return setFieldError('dropoffBy', { message: '하차 기한을 골라 주세요.' })
+    if (by <= pickup.from) return setFieldError('dropoffBy', { message: '하차 기한은 상차 시작 뒤여야 해요.' })
     create.mutate({
       pickup: siteInput('pickup', v),
       dropoff: siteInput('dropoff', v),
-      pickupFrom: localInputToIso(v.pickupFrom),
-      pickupUntil: localInputToIso(v.pickupUntil),
-      dropoffBy: localInputToIso(v.dropoffBy),
+      pickupFrom: pickup.from.toISOString(),
+      pickupUntil: pickup.until.toISOString(),
+      dropoffBy: by.toISOString(),
       cargoCategory: v.cargoCategory,
       cargoType: v.cargoType.trim(),
       weightKg: Number(v.weightKg),
@@ -161,10 +273,12 @@ export function OrderNewPage() {
       confirmMode: v.targetDriverId ? 'SELECT' : v.confirmMode,
       targetDriverId: v.targetDriverId ? Number(v.targetDriverId) : null,
     })
+  }
 
-  const siteOptions = sites.map((s) => ({ value: String(s.id), label: `${s.name} · ${s.address}` }))
-  const num = (field: keyof FormValues, label: string, opts: { min?: number; max?: number } = {}) =>
+  const siteOptions = [...sites.map((s) => ({ value: String(s.id), label: `${s.name} · ${s.address}` })), { value: NEW_SITE, label: '새 상하차지 적기' }]
+  const num = (field: keyof FormValues, label: string, opts: { min?: number; max?: number; onChange?: () => void } = {}) =>
     register(field, {
+      onChange: opts.onChange,
       required: `${label}을(를) 입력해 주세요.`,
       validate: (val) => {
         const n = Number(val)
@@ -174,61 +288,104 @@ export function OrderNewPage() {
         return true
       },
     })
+  // 새 상하차지를 적을 때만 검사한다
+  const siteText = (prefix: SitePrefix, field: 'Name' | 'Address', label: string) =>
+    register(`${prefix}${field}`, { validate: (val, all) => !isNewSite(all[`${prefix}Site`]) || val.trim() !== '' || `${label}을(를) 입력해 주세요.` })
+  const siteCoord = (prefix: SitePrefix, field: 'Lat' | 'Lng', label: string, min: number, max: number) =>
+    register(`${prefix}${field}`, {
+      validate: (val, all) => {
+        if (!isNewSite(all[`${prefix}Site`])) return true
+        const n = Number(val)
+        if (val.trim() === '' || Number.isNaN(n)) return `${label}을(를) 숫자로 입력해 주세요.`
+        if (n < min || n > max) return `${min}~${max} 사이여야 해요.`
+        return true
+      },
+    })
 
   return (
     <>
-      <PageHeader title="오더 등록" description="상하차지, 시간, 화물, 차량, 운임, 결제를 빠짐없이 적어야 차주 화면에 올라가요." back={{ to: '/orders', label: '오더' }} />
+      <PageHeader
+        title="오더 등록"
+        description="상하차지, 상차 시간, 화물, 운임만 적으면 차주 화면에 올라가요. 결제와 배차 방식은 회사 기본값을 써요."
+        back={{ to: '/orders', label: '오더' }}
+      />
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <div className="grid gap-5 lg:grid-cols-2">
           {(['pickup', 'dropoff'] as const).map((prefix) => {
             const label = prefix === 'pickup' ? '상차지' : '하차지'
-            const preset = prefix === 'pickup' ? pickupPreset : dropoffPreset
+            const chosen = prefix === 'pickup' ? pickupSite : dropoffSite
             return (
               <Card key={prefix} title={label}>
                 <div className="space-y-3.5">
                   {sites.length > 0 ? (
                     <SelectField
-                      label="이전에 쓴 곳에서 고르기"
-                      placeholder="새로 적기"
+                      label="어디서"
+                      required
+                      placeholder="이전에 쓴 곳에서 고르기"
                       options={siteOptions}
-                      value={preset}
-                      {...register(`${prefix}Preset`, { onChange: (e) => applyPreset(prefix, e.target.value) })}
+                      error={errorOf(`${prefix}Site`)}
+                      {...register(`${prefix}Site`, { validate: (val) => val !== '' || `${label}를 골라 주세요.` })}
                     />
                   ) : null}
-                  <Field label="이름" required placeholder="평택 포승 물류센터" error={formState.errors[`${prefix}Name`]?.message} {...register(`${prefix}Name`, { required: '이름을 입력해 주세요.' })} />
-                  <Field label="주소" required placeholder="경기 평택시 포승읍 평택항로 156" error={formState.errors[`${prefix}Address`]?.message} {...register(`${prefix}Address`, { required: '주소를 입력해 주세요.' })} />
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="위도" required placeholder="36.9631" inputMode="decimal" error={formState.errors[`${prefix}Lat`]?.message} {...num(`${prefix}Lat`, '위도', { min: -90, max: 90 })} />
-                    <Field label="경도" required placeholder="126.8337" inputMode="decimal" error={formState.errors[`${prefix}Lng`]?.message} {...num(`${prefix}Lng`, '경도', { min: -180, max: 180 })} />
-                  </div>
+                  {isNewSite(chosen) ? (
+                    <>
+                      <Field label="이름" required placeholder="평택 포승 물류센터" error={errorOf(`${prefix}Name`)} {...siteText(prefix, 'Name', '이름')} />
+                      <Field label="주소" required placeholder="경기 평택시 포승읍 평택항로 156" error={errorOf(`${prefix}Address`)} {...siteText(prefix, 'Address', '주소')} />
+                      <div className="grid grid-cols-2 gap-3">
+                        <Field label="위도" required placeholder="36.9631" inputMode="decimal" error={errorOf(`${prefix}Lat`)} {...siteCoord(prefix, 'Lat', '위도', -90, 90)} />
+                        <Field label="경도" required placeholder="126.8337" inputMode="decimal" error={errorOf(`${prefix}Lng`)} {...siteCoord(prefix, 'Lng', '경도', -180, 180)} />
+                      </div>
+                    </>
+                  ) : null}
                 </div>
               </Card>
             )
           })}
         </div>
 
-        <Card title="시간">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="상차 가능 시작" required type="datetime-local" error={formState.errors.pickupFrom?.message} {...register('pickupFrom', { required: '시간을 골라 주세요.' })} />
-            <Field label="상차 가능 마감" required type="datetime-local" error={formState.errors.pickupUntil?.message} {...register('pickupUntil', { required: '시간을 골라 주세요.' })} />
-            <Field label="하차 기한" required type="datetime-local" error={formState.errors.dropoffBy?.message} {...register('dropoffBy', { required: '시간을 골라 주세요.' })} />
+        <Card title="상차 시간">
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="상차 날짜" required type="date" error={errorOf('pickupDate')} {...register('pickupDate', { required: '날짜를 골라 주세요.' })} />
+              <Field label="상차 시각" required type="time" step={1800} error={errorOf('pickupTime')} {...register('pickupTime', { required: '시각을 골라 주세요.' })} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ChipGroup label="상차 가능 폭" value={pickupWindow} options={PICKUP_WINDOWS} onChange={(v) => setValue('pickupWindow', v)} hint="정시는 30분 안에 상차를 시작해야 해요." />
+              <ChipGroup label="하차 기한" value={deadlineChoice} options={DROPOFF_DEADLINES} onChange={(v) => setValue('dropoffDeadline', v)} />
+            </div>
+            {deadlineChoice === 'CUSTOM' ? (
+              <Field label="하차 기한" required type="datetime-local" className="sm:max-w-xs" error={errorOf('dropoffBy')} {...register('dropoffBy', { required: '하차 기한을 골라 주세요.' })} />
+            ) : (
+              errorOf('dropoffBy') && <ErrorText>{errorOf('dropoffBy')}</ErrorText>
+            )}
+            {timeSummary ? <p className="rounded-xl bg-canvas px-3.5 py-2.5 text-[13.5px] font-medium text-ink-mid">{timeSummary}</p> : null}
           </div>
         </Card>
 
         <Card title="화물과 차량">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <SelectField label="화물 종류" required options={CARGO_CATEGORIES} hint="냉동·냉장이면 차종도 냉동·냉장이어야 해요." {...register('cargoCategory')} />
-            <Field label="품목" required placeholder="파레트 12개 (식품)" hint="인수증에 그대로 적혀요." error={formState.errors.cargoType?.message} {...register('cargoType', { required: '품목을 입력해 주세요.' })} />
-            <Field label="무게 (kg)" required inputMode="numeric" placeholder="4500" error={formState.errors.weightKg?.message} {...num('weightKg', '무게', { min: 1, max: 50000 })} />
+            <Field label="품목" required placeholder="파레트 12개 (식품)" hint="인수증에 그대로 적혀요." error={errorOf('cargoType')} {...register('cargoType', { required: '품목을 입력해 주세요.' })} />
+            <Field label="무게 (kg)" required inputMode="numeric" placeholder="4500" error={errorOf('weightKg')} {...num('weightKg', '무게', { min: 1, max: 50000 })} />
+            <SelectField label="화물 종류" required options={CARGO_CATEGORIES} hint="냉동·냉장을 고르면 차종도 냉동·냉장으로 바뀌어요." {...register('cargoCategory')} />
             <SelectField label="톤수" required options={TONNAGES} {...register('tonnage')} />
             <SelectField label="차종" required options={BODY_TYPES} {...register('bodyType')} />
             <SelectField label="상하차 방식" required options={LOADING_METHODS} {...register('loadingMethod')} />
           </div>
         </Card>
 
-        <Card title="운임과 결제">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="지급운임 (원, 차주에게)" required inputMode="numeric" placeholder="450000" hint="차주 화면에 보이는 운임이에요." error={formState.errors.fare?.message} {...num('fare', '지급운임', { min: 0, max: 100_000_000 })} />
+        <Card title="운임">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field
+              label="청구운임 (원, 화주와 계약한 금액)"
+              inputMode="numeric"
+              placeholder="600000"
+              hint="주선사만 봐요. 비워도 돼요."
+              error={errorOf('billedFare')}
+              {...register('billedFare', {
+                onChange: () => setFareTouched(false),
+                validate: (val) => val === '' || (!Number.isNaN(Number(val)) && Number(val) >= 0 && Number(val) <= 100_000_000) || '0 이상 숫자로 입력해 주세요.',
+              })}
+            />
             <Field
               label="수수료율 (%)"
               type="number"
@@ -236,41 +393,59 @@ export function OrderNewPage() {
               max={99.9}
               step={0.1}
               placeholder="10"
-              hint="적으면 청구운임을 계산해 채워요. 수수료율 = 수수료 ÷ 청구운임."
-              error={formState.errors.feeRate?.message}
-              {...register('feeRate', { onChange: () => setBilledTouched(false), min: { value: 0, message: '0~99.9%' }, max: { value: 99.9, message: '0~99.9%' } })}
+              hint="청구운임 기준이에요. 회사 기본값을 미리 채워요."
+              error={errorOf('feeRate')}
+              {...register('feeRate', { onChange: () => setFareTouched(false), min: { value: 0, message: '0~99.9%' }, max: { value: 99.9, message: '0~99.9%' } })}
             />
             <Field
-              label="청구운임 (원, 화주에게)"
+              label="지급운임 (원, 차주에게)"
+              required
               inputMode="numeric"
-              placeholder="600000"
-              hint={fee !== null ? `수수료 ${formatWon(fee)}${actualFeeRate !== null ? ` · ${actualFeeRate}%` : ''}${fee < 0 ? ' — 지급운임보다 적어요' : ''}` : '비우면 수수료를 계산하지 않아요. 차주에게는 안 보여요.'}
-              error={formState.errors.billedFare?.message}
-              {...register('billedFare', {
-                onChange: () => setBilledTouched(true),
-                validate: (val) => val === '' || (!Number.isNaN(Number(val)) && Number(val) >= 0 && Number(val) <= 100_000_000) || '0 이상 숫자로 입력해 주세요.',
-              })}
+              placeholder="540000"
+              hint={fareHint}
+              error={errorOf('fare')}
+              {...num('fare', '지급운임', { min: 0, max: 100_000_000, onChange: () => setFareTouched(true) })}
             />
-            <Field label="거래처 (화주)" placeholder="대한제강" maxLength={50} hint="주선사만 봐요." error={formState.errors.customerName?.message} {...register('customerName')} />
-            <SelectField label="결제 방식" required options={PAYMENT_TYPES.map((p) => ({ value: p.value, label: `${p.label} — ${p.hint}` }))} {...register('paymentType')} />
-            {paymentType === 'RECEIPT' ? (
-              <Field label="지급 예정 (인수증 전달 뒤 일수)" inputMode="numeric" hint={`비우면 회사 정산 주기 ${me?.settlementDays ?? 30}일`} error={formState.errors.expectedPaymentDays?.message} {...register('expectedPaymentDays')} />
-            ) : null}
-            <SelectField label="운송 형태" options={Object.entries(CONSIGNMENT).map(([value, label]) => ({ value, label }))} {...register('consignmentType')} />
           </div>
         </Card>
 
-        <Card title="배차 방식">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <SelectField
-              label="지정 차주"
-              placeholder="오더 마켓에 공개 (누구나 요청)"
-              options={(drivers.data ?? []).map((d) => ({ value: String(d.driverUserId), label: `${d.name} · ${d.plateNumber ?? '차량 없음'}` }))}
-              hint="단골 차주에게만 지정할 수 있어요. 지정하면 그 차주에게만 보여요."
-              {...register('targetDriverId')}
-            />
-            <SelectField label="확정 방식" options={Object.entries(CONFIRM_MODE).map(([value, label]) => ({ value, label }))} disabled={Boolean(targetDriverId)} {...register('confirmMode')} />
-          </div>
+        <Card
+          title="결제·배차·거래처"
+          action={
+            <Button type="button" variant="ghost" size="sm" onClick={() => setAdvancedOpen((open) => !open)}>
+              {advancedOpen ? '접기' : '바꾸기'}
+            </Button>
+          }
+        >
+          {advancedOpen ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <SelectField label="결제 방식" required options={PAYMENT_TYPES.map((p) => ({ value: p.value, label: `${p.label} — ${p.hint}` }))} {...register('paymentType')} />
+              {paymentType === 'RECEIPT' ? (
+                <Field
+                  label="지급 예정 (인수증 전달 뒤 일수)"
+                  inputMode="numeric"
+                  hint={`비우면 회사 정산 주기 ${me?.settlementDays ?? 30}일`}
+                  error={errorOf('expectedPaymentDays')}
+                  {...register('expectedPaymentDays')}
+                />
+              ) : null}
+              <SelectField label="운송 형태" options={Object.entries(CONSIGNMENT).map(([value, label]) => ({ value, label }))} {...register('consignmentType')} />
+              <SelectField
+                label="지정 차주"
+                placeholder="오더 마켓에 공개 (누구나 요청)"
+                options={(drivers.data ?? []).map((d) => ({ value: String(d.driverUserId), label: `${d.name} · ${d.plateNumber ?? '차량 없음'}` }))}
+                hint="단골 차주에게만 지정할 수 있어요. 지정하면 그 차주에게만 보여요."
+                {...register('targetDriverId')}
+              />
+              <SelectField label="확정 방식" options={Object.entries(CONFIRM_MODE).map(([value, label]) => ({ value, label }))} disabled={Boolean(targetDriverId)} {...register('confirmMode')} />
+              <Field label="거래처 (화주)" placeholder="대한제강" maxLength={50} hint="주선사만 봐요." error={errorOf('customerName')} {...register('customerName')} />
+            </div>
+          ) : (
+            <div>
+              <p className="text-[14.5px] font-medium text-ink-strong">{advancedSummary}</p>
+              <p className="mt-1 text-[12.5px] text-ink-sub">회사 기본값이에요. 이 오더만 다르게 하려면 바꾸기를 누르세요.</p>
+            </div>
+          )}
         </Card>
 
         <ErrorText>{error}</ErrorText>

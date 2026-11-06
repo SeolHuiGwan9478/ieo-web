@@ -138,6 +138,12 @@ export function billedFareFor(fare: number, feeRate: number) {
   return Math.round(fare / (1 - feeRate / 100) / 1000) * 1000
 }
 
+/** 청구운임과 수수료율(%)로 지급운임 계산: 청구 × (1 − 율), 1,000원 단위 반올림. 주선사가 화주 금액을 먼저 정하는 순서용 */
+export function fareFor(billedFare: number, feeRate: number) {
+  if (!Number.isFinite(billedFare) || !Number.isFinite(feeRate) || feeRate < 0 || feeRate >= 100) return null
+  return Math.round((billedFare * (1 - feeRate / 100)) / 1000) * 1000
+}
+
 /** 수수료율(%) = (청구 − 지급) ÷ 청구, 소수 첫째 자리 */
 export function feeRateOf(fare: number, billedFare: number) {
   if (!billedFare) return null
