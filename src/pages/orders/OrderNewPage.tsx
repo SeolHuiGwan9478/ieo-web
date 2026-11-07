@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { fareFor, feeRateOf, ordersApi, type CreateOrderRequest, type OrderSite } from '../../api/orders'
 import { driversApi } from '../../api/people'
 import { ApiError } from '../../api/client'
+import { addressesApi } from '../../api/addresses'
+import { AddressSearch } from '../../components/AddressSearch'
+import type { PostcodeResult } from '../../lib/postcode'
 import { BODY_TYPES, CARGO_CATEGORIES, CONFIRM_MODE, CONSIGNMENT, LOADING_METHODS, PAYMENT_TYPES, TONNAGES } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
 import { Button, Card, ChipGroup, ErrorText, Field, PageHeader, SelectField } from '../../components/ui'
@@ -12,7 +15,7 @@ import { formatDateTime, formatWon, localInputValue } from '../../lib/format'
 
 /**
  * 오더 등록 (DSP-001). 서버가 요구하는 항목은 그대로 두고 타이핑을 줄인다.
- * - 상하차지: 이전에 쓴 곳을 고르면 끝. 새 곳만 이름·주소·좌표를 적는다 (주소 검색은 아직 없음)
+ * - 상하차지: 이전에 쓴 곳을 고르면 끝. 새 곳은 주소를 검색하면 좌표를 자동으로 조회한다
  * - 시간: 상차 날짜·시각 하나와 "상차 가능 폭", "하차 기한"을 고르면 세 시각이 계산된다
  * - 운임: 주선사가 일하는 순서대로. 화주 계약가(청구운임)와 수수료율을 적으면 차주 지급운임이 채워진다. 지급운임만 적어도 된다
  * - 결제·운송 형태·확정 방식·거래처: 회사 기본값으로 접어 둔다
@@ -37,11 +40,13 @@ interface FormValues {
   pickupSite: string
   pickupName: string
   pickupAddress: string
+  pickupDetailAddress: string
   pickupLat: string
   pickupLng: string
   dropoffSite: string
   dropoffName: string
   dropoffAddress: string
+  dropoffDetailAddress: string
   dropoffLat: string
   dropoffLng: string
   /** YYYY-MM-DD */
@@ -114,6 +119,11 @@ export function OrderNewPage() {
   const { me } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [searchingSite, setSearchingSite] = useState<SitePrefix | null>(null)
+  const [locating, setLocating] = useState({ pickup: false, dropoff: false })
+  const [locationError, setLocationError] = useState<Record<SitePrefix, string | null>>({ pickup: null, dropoff: null })
+  const requestVersion = useRef({ pickup: 0, dropoff: 0 })
+  useEffect(() => () => { requestVersion.current.pickup++; requestVersion.current.dropoff++ }, [])
 
   // 이전 오더의 상하차지를 고를 수 있게
   const recent = useQuery({ queryKey: ['orders', { status: '', page: 0, size: 50 }], queryFn: () => ordersApi.list({ status: '', page: 0, size: 50 }) })
@@ -130,16 +140,18 @@ export function OrderNewPage() {
   const isNewSite = (chosen: string) => sites.length === 0 || chosen === NEW_SITE
 
   const start = useMemo(defaultPickupStart, [])
-  const { register, handleSubmit, watch, setValue, formState, setError: setFieldError } = useForm<FormValues>({
+  const { register, handleSubmit, watch, setValue, getValues, clearErrors, formState, setError: setFieldError } = useForm<FormValues>({
     defaultValues: {
       pickupSite: '',
       pickupName: '',
       pickupAddress: '',
+      pickupDetailAddress: '',
       pickupLat: '',
       pickupLng: '',
       dropoffSite: '',
       dropoffName: '',
       dropoffAddress: '',
+      dropoffDetailAddress: '',
       dropoffLat: '',
       dropoffLng: '',
       pickupDate: localInputValue(start).slice(0, 10),
@@ -164,6 +176,38 @@ export function OrderNewPage() {
       targetDriverId: '',
     },
   })
+  const locateAddress = useCallback(async (prefix: SitePrefix, address: string) => {
+    const version = ++requestVersion.current[prefix]
+    setValue(`${prefix}Lat`, '')
+    setValue(`${prefix}Lng`, '')
+    setLocating((s) => ({ ...s, [prefix]: true }))
+    setLocationError((s) => ({ ...s, [prefix]: null }))
+    try {
+      const result = await addressesApi.geocode(address)
+      if (version !== requestVersion.current[prefix] || getValues(`${prefix}Address`) !== address) return
+      setValue(`${prefix}Lat`, String(result.lat), { shouldValidate: true })
+      setValue(`${prefix}Lng`, String(result.lng), { shouldValidate: true })
+    } catch (e) {
+      if (version !== requestVersion.current[prefix]) return
+      setLocationError((s) => ({ ...s, [prefix]: e instanceof ApiError ? e.message : '위치를 조회하지 못했어요. 서버 연결을 확인하고 다시 시도해 주세요.' }))
+    } finally {
+      if (version === requestVersion.current[prefix]) setLocating((s) => ({ ...s, [prefix]: false }))
+    }
+  }, [getValues, setValue])
+
+  const selectAddress = useCallback((result: PostcodeResult) => {
+    if (!searchingSite) return
+    const prefix = searchingSite
+    const address = (result.userSelectedType === 'R' ? result.roadAddress : result.jibunAddress) || result.address
+    setValue(`${prefix}Address`, address, { shouldDirty: true, shouldValidate: true })
+    setValue(`${prefix}DetailAddress`, '')
+    if (!getValues(`${prefix}Name`).trim() && result.buildingName) {
+      setValue(`${prefix}Name`, result.buildingName, { shouldDirty: true, shouldValidate: true })
+    }
+    clearErrors([`${prefix}Lat`, `${prefix}Lng`])
+    setSearchingSite(null)
+    void locateAddress(prefix, address)
+  }, [searchingSite, getValues, setValue, clearErrors, locateAddress])
   const pickupSite = watch('pickupSite')
   const dropoffSite = watch('dropoffSite')
   const pickupDate = watch('pickupDate')
@@ -241,10 +285,19 @@ export function OrderNewPage() {
   const siteInput = (prefix: SitePrefix, v: FormValues) => {
     const chosen = v[`${prefix}Site`]
     if (!isNewSite(chosen)) return { siteId: Number(chosen) }
-    return { site: { name: v[`${prefix}Name`].trim(), address: v[`${prefix}Address`].trim(), lat: Number(v[`${prefix}Lat`]), lng: Number(v[`${prefix}Lng`]) } }
+    return { site: { name: v[`${prefix}Name`].trim(), address: [v[`${prefix}Address`].trim(), v[`${prefix}DetailAddress`].trim()].filter(Boolean).join(' '), lat: Number(v[`${prefix}Lat`]), lng: Number(v[`${prefix}Lng`]) } }
   }
 
   const onSubmit = (v: FormValues) => {
+    for (const prefix of ['pickup', 'dropoff'] as const) {
+      if (!isNewSite(v[`${prefix}Site`])) continue
+      if (!v[`${prefix}Lat`] || !v[`${prefix}Lng`] || locating[prefix]) {
+        return setFieldError(`${prefix}Address`, { message: '주소 검색으로 위치를 확인해 주세요.' })
+      }
+      if ([v[`${prefix}Address`].trim(), v[`${prefix}DetailAddress`].trim()].filter(Boolean).join(' ').length > 200) {
+        return setFieldError(`${prefix}DetailAddress`, { message: '기본 주소와 상세주소를 합쳐 200자 이내로 입력해 주세요.' })
+      }
+    }
     const pickup = pickupRange(v.pickupDate, v.pickupTime, v.pickupWindow)
     if (!pickup) return setFieldError('pickupTime', { message: '상차 날짜와 시각을 골라 주세요.' })
     if (pickup.until <= pickup.from) return setFieldError('pickupTime', { message: '당일 상차는 자정 전 시각이어야 해요.' })
@@ -291,12 +344,12 @@ export function OrderNewPage() {
   // 새 상하차지를 적을 때만 검사한다
   const siteText = (prefix: SitePrefix, field: 'Name' | 'Address', label: string) =>
     register(`${prefix}${field}`, { validate: (val, all) => !isNewSite(all[`${prefix}Site`]) || val.trim() !== '' || `${label}을(를) 입력해 주세요.` })
-  const siteCoord = (prefix: SitePrefix, field: 'Lat' | 'Lng', label: string, min: number, max: number) =>
+  const siteCoord = (prefix: SitePrefix, field: 'Lat' | 'Lng', min: number, max: number) =>
     register(`${prefix}${field}`, {
       validate: (val, all) => {
         if (!isNewSite(all[`${prefix}Site`])) return true
         const n = Number(val)
-        if (val.trim() === '' || Number.isNaN(n)) return `${label}을(를) 숫자로 입력해 주세요.`
+        if (val.trim() === '' || Number.isNaN(n)) return '주소 검색으로 위치를 확인해 주세요.'
         if (n < min || n > max) return `${min}~${max} 사이여야 해요.`
         return true
       },
@@ -329,11 +382,19 @@ export function OrderNewPage() {
                   ) : null}
                   {isNewSite(chosen) ? (
                     <>
-                      <Field label="이름" required placeholder="평택 포승 물류센터" error={errorOf(`${prefix}Name`)} {...siteText(prefix, 'Name', '이름')} />
-                      <Field label="주소" required placeholder="경기 평택시 포승읍 평택항로 156" error={errorOf(`${prefix}Address`)} {...siteText(prefix, 'Address', '주소')} />
-                      <div className="grid grid-cols-2 gap-3">
-                        <Field label="위도" required placeholder="36.9631" inputMode="decimal" error={errorOf(`${prefix}Lat`)} {...siteCoord(prefix, 'Lat', '위도', -90, 90)} />
-                        <Field label="경도" required placeholder="126.8337" inputMode="decimal" error={errorOf(`${prefix}Lng`)} {...siteCoord(prefix, 'Lng', '경도', -180, 180)} />
+                      <Field label="이름" required maxLength={100} placeholder="평택 포승 물류센터" error={errorOf(`${prefix}Name`)} {...siteText(prefix, 'Name', '이름')} />
+                      <div className="flex items-start gap-2">
+                        <Field className="min-w-0 flex-1" label="주소" required readOnly placeholder="주소 검색으로 선택해 주세요" error={errorOf(`${prefix}Address`)} {...siteText(prefix, 'Address', '주소')} />
+                        <Button type="button" variant="secondary" className="mt-6" onClick={() => setSearchingSite(prefix)}>주소 검색</Button>
+                      </div>
+                      {searchingSite === prefix ? <AddressSearch onSelect={selectAddress} onClose={() => setSearchingSite(null)} /> : null}
+                      <Field label="상세주소 (선택)" error={errorOf(`${prefix}DetailAddress`)} placeholder="동·호수, 물류센터 진입로 등" maxLength={100} {...register(`${prefix}DetailAddress`)} />
+                      <input type="hidden" {...siteCoord(prefix, 'Lat', -90, 90)} />
+                      <input type="hidden" {...siteCoord(prefix, 'Lng', -180, 180)} />
+                      <div aria-live="polite" className="text-[13px]">
+                        {locating[prefix] ? <p role="status" className="text-ink-sub">선택한 주소의 위치를 확인하고 있어요.</p> : locationError[prefix] ? (
+                          <div><ErrorText>{locationError[prefix]}</ErrorText><Button type="button" variant="secondary" size="sm" className="mt-2" onClick={() => void locateAddress(prefix, getValues(`${prefix}Address`))}>위치 다시 조회</Button></div>
+                        ) : watch(`${prefix}Lat`) && watch(`${prefix}Lng`) ? <p className="text-status-green">위치를 확인했어요.</p> : errorOf(`${prefix}Lat`) || errorOf(`${prefix}Lng`) ? <ErrorText>주소 검색으로 위치를 확인해 주세요.</ErrorText> : <p className="text-ink-sub">주소를 선택하면 위치가 자동으로 입력돼요.</p>}
                       </div>
                     </>
                   ) : null}
@@ -453,7 +514,7 @@ export function OrderNewPage() {
           <Button type="button" variant="secondary" onClick={() => navigate('/orders')}>
             취소
           </Button>
-          <Button type="submit" loading={create.isPending}>
+          <Button type="submit" loading={create.isPending} disabled={locating.pickup || locating.dropoff}>
             오더 올리기
           </Button>
         </div>

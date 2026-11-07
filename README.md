@@ -32,3 +32,14 @@ npm run dev              # http://localhost:5173 (.env의 VITE_PORT로 바꿀 �
 - 색은 `ieo-app/design/README.md` 그대로 (`src/index.css`의 `@theme`). 주황은 로고·주요 버튼·선택된 메뉴에만, 운행 상태는 신호등
 - 서버 응답의 `xxxLabel`을 그대로 보여 준다. 콘솔에 번역표를 두지 않는다
 - 시각은 UTC로 오가고 화면에서 한국 시간으로 바꾼다
+
+## 상하차지 주소 검색
+
+- 오더 등록에서 새 상하차지를 선택한 뒤 `주소 검색`으로 도로명·지번·건물명을 검색한다.
+- 검색은 카카오 우편번호 서비스를 페이지 안에 삽입한다. 별도 JavaScript 키가 필요하지 않다.
+- 주소 선택 후 인증된 `GET /api/brokers/me/addresses/geocode?address=...`로 좌표를 조회한다.
+- 서버 `ieo-server/.env`에 `KAKAO_REST_API_KEY`를 설정하고 카카오디벨로퍼스에서 카카오맵을 활성화해야 한다.
+- 키는 서버에만 둔다. 프론트의 `VITE_*` 변수에는 넣지 않는다.
+- 상세주소는 좌표 변환 후 따로 입력한다. 기존 상하차지는 저장된 좌표를 그대로 사용한다.
+- 주소·좌표 조회에 실패하면 재시도할 수 있으며, 좌표 확인 전에는 새 상하차지를 등록할 수 없다.
+- DB 없는 좌표 조회 단위 테스트: 서버 폴더에서 `./gradlew test --tests '*AddressGeocodingServiceTest'` (JDK 21 필요).
