@@ -21,7 +21,7 @@ export const CONSENT_VERSION = '2026-11'
  * 인증번호는 로컬 서버에서는 문자가 아니라 서버 로그의 [문자 발송] 줄에 찍힌다
  */
 export const authApi = {
-  sendCode: (phone: string) => api<void>('/api/auth/phone/code', { method: 'POST', body: { phone }, auth: false }),
+  sendCode: (phone: string) => api<{ demoCode: string; expiresInSeconds: number } | void>('/api/auth/phone/code', { method: 'POST', body: { phone }, auth: false }),
   verify: (phone: string, code: string) =>
     api<PhoneVerifyResponse>('/api/auth/phone/verify', {
       method: 'POST',

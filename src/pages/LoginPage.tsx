@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation } from '@tanstack/react-query'
 import { authApi, type ConsentType, type PhoneVerifyResponse } from '../api/auth'
@@ -16,6 +16,12 @@ export function LoginPage() {
   const { login } = useAuth()
   const [step, setStep] = useState<Step>('phone')
   const [phone, setPhone] = useState('')
+  const [demo, setDemo] = useState<{ code: string; expiresAt: number } | null>(null)
+  useEffect(() => {
+    if (!demo) return
+    const timeout = window.setTimeout(() => setDemo(null), Math.max(0, demo.expiresAt - Date.now()))
+    return () => window.clearTimeout(timeout)
+  }, [demo])
   const [verified, setVerified] = useState<PhoneVerifyResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -23,7 +29,9 @@ export function LoginPage() {
 
   const sendCode = useMutation({
     mutationFn: (value: string) => authApi.sendCode(value),
-    onSuccess: (_, value) => {
+    onMutate: () => setDemo(null),
+    onSuccess: (result, value) => {
+      setDemo(result?.demoCode ? { code: result.demoCode, expiresAt: Date.now() + result.expiresInSeconds * 1000 } : null)
       setPhone(value)
       setError(null)
       setStep('code')
@@ -73,9 +81,11 @@ export function LoginPage() {
           {step === 'code' && (
             <CodeForm
               phone={phone}
+              demoCode={demo?.code ?? null}
+              sending={sendCode.isPending}
               loading={verify.isPending}
               onSubmit={(code) => verify.mutate(code)}
-              onBack={() => setStep('phone')}
+              onBack={() => { setDemo(null); setStep('phone') }}
               onResend={() => sendCode.mutate(phone)}
             />
           )}
@@ -83,7 +93,7 @@ export function LoginPage() {
           {error ? <div className="mt-4"><ErrorText>{error}</ErrorText></div> : null}
         </Card>
         <p className="mt-4 text-center text-[12px] text-ink-sub">
-          로컬 서버에서는 인증번호가 문자 대신 서버 로그의 [문자 발송] 줄에 찍혀요.
+          휴대폰 인증으로 주선사 계정에 로그인해요.
         </p>
       </div>
     </div>
@@ -115,12 +125,16 @@ function PhoneForm({ loading, onSubmit }: { loading: boolean; onSubmit: (phone: 
 
 function CodeForm({
   phone,
+  demoCode,
+  sending,
   loading,
   onSubmit,
   onBack,
   onResend,
 }: {
   phone: string
+  demoCode: string | null
+  sending: boolean
   loading: boolean
   onSubmit: (code: string) => void
   onBack: () => void
@@ -142,12 +156,13 @@ function CodeForm({
         error={formState.errors.code?.message}
         {...register('code', { required: '인증번호를 입력해 주세요.', pattern: { value: /^\d{6}$/, message: '인증번호는 6자리 숫자예요.' } })}
       />
-      <Button type="submit" className="w-full" loading={loading}>
+      {demoCode ? <p role="status" className="rounded-xl bg-orange-50 px-3.5 py-3 text-[14px] text-orange-700">시연용 인증번호: <strong className="ml-1 text-[18px] tracking-widest">{demoCode}</strong><span className="mt-1 block text-[12px]">발급 후 3분간 유효해요.</span></p> : null}
+      <Button type="submit" className="w-full" loading={loading} disabled={sending}>
         확인
       </Button>
       <div className="flex justify-between text-[13px] text-ink-sub">
         <button type="button" onClick={onBack} className="hover:text-ink-mid">번호 다시 입력</button>
-        <button type="button" onClick={onResend} className="hover:text-ink-mid">인증번호 다시 받기</button>
+        <button type="button" disabled={sending || loading} onClick={onResend} className="hover:text-ink-mid disabled:opacity-40">{sending ? '발송 중…' : '인증번호 다시 받기'}</button>
       </div>
     </form>
   )

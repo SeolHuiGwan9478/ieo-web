@@ -362,6 +362,7 @@ export function OrderNewPage() {
         description="상하차지, 상차 시간, 화물, 운임만 적으면 차주 화면에 올라가요. 결제와 배차 방식은 회사 기본값을 써요."
         back={{ to: '/orders', label: '오더' }}
       />
+      {searchingSite ? <AddressSearch onSelect={selectAddress} onClose={() => setSearchingSite(null)} /> : null}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <div className="grid gap-5 lg:grid-cols-2">
           {(['pickup', 'dropoff'] as const).map((prefix) => {
@@ -387,7 +388,7 @@ export function OrderNewPage() {
                         <Field className="min-w-0 flex-1" label="주소" required readOnly placeholder="주소 검색으로 선택해 주세요" error={errorOf(`${prefix}Address`)} {...siteText(prefix, 'Address', '주소')} />
                         <Button type="button" variant="secondary" className="mt-6" onClick={() => setSearchingSite(prefix)}>주소 검색</Button>
                       </div>
-                      {searchingSite === prefix ? <AddressSearch onSelect={selectAddress} onClose={() => setSearchingSite(null)} /> : null}
+
                       <Field label="상세주소 (선택)" error={errorOf(`${prefix}DetailAddress`)} placeholder="동·호수, 물류센터 진입로 등" maxLength={100} {...register(`${prefix}DetailAddress`)} />
                       <input type="hidden" {...siteCoord(prefix, 'Lat', -90, 90)} />
                       <input type="hidden" {...siteCoord(prefix, 'Lng', -180, 180)} />
