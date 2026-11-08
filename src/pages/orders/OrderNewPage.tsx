@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
-import { fareFor, feeRateOf, ordersApi, type CreateOrderRequest, type OrderSite } from '../../api/orders'
+import { fareFor, feeRateOf, ordersApi, type CreateOrderRequest } from '../../api/orders'
 import { driversApi } from '../../api/people'
 import { ApiError } from '../../api/client'
 import { addressesApi, savedAddressesApi, type SavedAddress, type SaveAddressInput } from '../../api/addresses'
@@ -15,12 +15,11 @@ import { formatDateTime, formatWon, localInputValue } from '../../lib/format'
 
 /**
  * 오더 등록 (DSP-001). 서버가 요구하는 항목은 그대로 두고 타이핑을 줄인다.
- * - 상하차지: 이전에 쓴 곳을 고르면 끝. 새 곳은 주소를 검색하면 좌표를 자동으로 조회한다
+ * - 상하차지: 직접 입력을 기본으로 하고 자주 쓰는 주소는 별도 드롭다운으로 불러온다
  * - 시간: 상차 날짜·시각 하나와 "상차 가능 폭", "하차 기한"을 고르면 세 시각이 계산된다
  * - 운임: 주선사가 일하는 순서대로. 화주 계약가(청구운임)와 수수료율을 적으면 차주 지급운임이 채워진다. 지급운임만 적어도 된다
  * - 결제·운송 형태·확정 방식·거래처: 회사 기본값으로 접어 둔다
  */
-const NEW_SITE = 'new'
 type PickupWindow = 'EXACT' | 'HOURS_2' | 'SAME_DAY'
 type DropoffDeadline = 'SAME_DAY' | 'NEXT_MORNING' | 'CUSTOM'
 
@@ -36,14 +35,11 @@ const DROPOFF_DEADLINES: { value: DropoffDeadline; label: string }[] = [
 ]
 
 interface FormValues {
-  /** 저장된 상하차지 id. NEW_SITE면 새로 적는다 */
-  pickupSite: string
   pickupName: string
   pickupAddress: string
   pickupDetailAddress: string
   pickupLat: string
   pickupLng: string
-  dropoffSite: string
   dropoffName: string
   dropoffAddress: string
   dropoffDetailAddress: string
@@ -151,30 +147,16 @@ export function OrderNewPage() {
     onError: (e, { prefix }) => setSavedError((s) => ({ ...s, [prefix]: e instanceof ApiError ? e.message : '저장 해제를 완료하지 못했어요.' })),
   })
 
-  // 이전 오더의 상하차지를 고를 수 있게
-  const recent = useQuery({ queryKey: ['orders', { status: '', page: 0, size: 50 }], queryFn: () => ordersApi.list({ status: '', page: 0, size: 50 }) })
   const drivers = useQuery({ queryKey: ['drivers'], queryFn: driversApi.list })
-  const sites = useMemo(() => {
-    const map = new Map<number, OrderSite>()
-    recent.data?.items.forEach((o) => {
-      map.set(o.pickup.id, o.pickup)
-      map.set(o.dropoff.id, o.dropoff)
-    })
-    return [...map.values()]
-  }, [recent.data])
-  /** 저장된 곳이 하나도 없으면 고를 것 없이 바로 적는다 */
-  const isNewSite = (chosen: string) => sites.length === 0 || chosen === NEW_SITE
 
   const start = useMemo(defaultPickupStart, [])
   const { register, handleSubmit, watch, setValue, getValues, clearErrors, formState, setError: setFieldError } = useForm<FormValues>({
     defaultValues: {
-      pickupSite: '',
       pickupName: '',
       pickupAddress: '',
       pickupDetailAddress: '',
       pickupLat: '',
       pickupLng: '',
-      dropoffSite: '',
       dropoffName: '',
       dropoffAddress: '',
       dropoffDetailAddress: '',
@@ -240,12 +222,13 @@ export function OrderNewPage() {
   const applySavedAddress = (prefix: SitePrefix, id: string) => {
     const saved = savedAddresses.data?.find((item) => String(item.id) === id)
     setSavedChoice((s) => ({ ...s, [prefix]: id }))
+    setSavedNotice((s) => ({ ...s, [prefix]: null }))
+    setSavedError((s) => ({ ...s, [prefix]: null }))
     if (!saved) return
     requestVersion.current[prefix]++
     setLocating((s) => ({ ...s, [prefix]: false }))
     setLocationError((s) => ({ ...s, [prefix]: null }))
     setSearchingSite(null)
-    setValue(`${prefix}Site`, NEW_SITE, { shouldDirty: true, shouldValidate: true })
     for (const [field, value] of Object.entries({ Name: saved.name, Address: saved.address, DetailAddress: saved.detailAddress, Lat: String(saved.lat), Lng: String(saved.lng) })) {
       setValue(`${prefix}${field}` as keyof FormValues, value, { shouldDirty: true, shouldValidate: true })
     }
@@ -255,13 +238,11 @@ export function OrderNewPage() {
   }
 
   const saveCurrentAddress = (prefix: SitePrefix) => {
-    const chosen = getValues(`${prefix}Site`)
-    const recentSite = !isNewSite(chosen) ? sites.find((site) => String(site.id) === chosen) : undefined
-    const name = (recentSite?.name ?? getValues(`${prefix}Name`)).trim()
-    const address = (recentSite?.address ?? getValues(`${prefix}Address`)).trim()
-    const detailAddress = recentSite ? '' : getValues(`${prefix}DetailAddress`).trim()
-    const latText = recentSite ? String(recentSite.lat) : getValues(`${prefix}Lat`)
-    const lngText = recentSite ? String(recentSite.lng) : getValues(`${prefix}Lng`)
+    const name = getValues(`${prefix}Name`).trim()
+    const address = getValues(`${prefix}Address`).trim()
+    const detailAddress = getValues(`${prefix}DetailAddress`).trim()
+    const latText = getValues(`${prefix}Lat`)
+    const lngText = getValues(`${prefix}Lng`)
     if (!name || !address || !latText || !lngText || locating[prefix]) {
       setSavedError((s) => ({ ...s, [prefix]: '이름을 입력하고 주소 검색으로 위치를 확인한 뒤 저장해 주세요.' }))
       return
@@ -274,8 +255,6 @@ export function OrderNewPage() {
     setSavedError((s) => ({ ...s, [prefix]: null }))
     saveAddress.mutate({ prefix, body: { name, address, detailAddress, lat: Number(latText), lng: Number(lngText) } })
   }
-  const pickupSite = watch('pickupSite')
-  const dropoffSite = watch('dropoffSite')
   const pickupDate = watch('pickupDate')
   const pickupTime = watch('pickupTime')
   const pickupWindow = watch('pickupWindow')
@@ -349,14 +328,11 @@ export function OrderNewPage() {
   })
 
   const siteInput = (prefix: SitePrefix, v: FormValues) => {
-    const chosen = v[`${prefix}Site`]
-    if (!isNewSite(chosen)) return { siteId: Number(chosen) }
     return { site: { name: v[`${prefix}Name`].trim(), address: [v[`${prefix}Address`].trim(), v[`${prefix}DetailAddress`].trim()].filter(Boolean).join(' '), lat: Number(v[`${prefix}Lat`]), lng: Number(v[`${prefix}Lng`]) } }
   }
 
   const onSubmit = (v: FormValues) => {
     for (const prefix of ['pickup', 'dropoff'] as const) {
-      if (!isNewSite(v[`${prefix}Site`])) continue
       if (!v[`${prefix}Lat`] || !v[`${prefix}Lng`] || locating[prefix]) {
         return setFieldError(`${prefix}Address`, { message: '주소 검색으로 위치를 확인해 주세요.' })
       }
@@ -394,7 +370,6 @@ export function OrderNewPage() {
     })
   }
 
-  const siteOptions = [...sites.map((s) => ({ value: String(s.id), label: `${s.name} · ${s.address}` })), { value: NEW_SITE, label: '새 상하차지 적기' }]
   const num = (field: keyof FormValues, label: string, opts: { min?: number; max?: number; onChange?: () => void } = {}) =>
     register(field, {
       onChange: opts.onChange,
@@ -407,13 +382,11 @@ export function OrderNewPage() {
         return true
       },
     })
-  // 새 상하차지를 적을 때만 검사한다
   const siteText = (prefix: SitePrefix, field: 'Name' | 'Address', label: string) =>
-    register(`${prefix}${field}`, { validate: (val, all) => !isNewSite(all[`${prefix}Site`]) || val.trim() !== '' || `${label}을(를) 입력해 주세요.` })
+    register(`${prefix}${field}`, { validate: (val) => val.trim() !== '' || `${label}을(를) 입력해 주세요.` })
   const siteCoord = (prefix: SitePrefix, field: 'Lat' | 'Lng', min: number, max: number) =>
     register(`${prefix}${field}`, {
-      validate: (val, all) => {
-        if (!isNewSite(all[`${prefix}Site`])) return true
+      validate: (val) => {
         const n = Number(val)
         if (val.trim() === '' || Number.isNaN(n)) return '주소 검색으로 위치를 확인해 주세요.'
         if (n < min || n > max) return `${min}~${max} 사이여야 해요.`
@@ -433,45 +406,30 @@ export function OrderNewPage() {
         <div className="grid gap-5 lg:grid-cols-2">
           {(['pickup', 'dropoff'] as const).map((prefix) => {
             const label = prefix === 'pickup' ? '상차지' : '하차지'
-            const chosen = prefix === 'pickup' ? pickupSite : dropoffSite
             return (
               <Card key={prefix} title={label}>
                 <div className="space-y-3.5">
                   <div className="rounded-xl bg-canvas/70 p-3">
                     <div className="flex items-end gap-2">
-                      <SelectField className="min-w-0 flex-1" label="자주 쓰는 주소" aria-label={`${label} 자주 쓰는 주소`} value={savedChoice[prefix]} disabled={savedAddresses.isPending || savedAddresses.isError || !savedAddresses.data?.length} placeholder={savedAddresses.isPending ? '불러오는 중…' : savedAddresses.data?.length ? '저장한 주소 선택' : '아래에서 주소를 입력하고 저장해 주세요'} options={(savedAddresses.data ?? []).map((item) => ({ value: String(item.id), label: `${item.name} · ${item.address}${item.detailAddress ? ` ${item.detailAddress}` : ''}` }))} onChange={(e) => applySavedAddress(prefix, e.target.value)} />
+                      <SelectField className="min-w-0 flex-1" label="자주 쓰는 주소" aria-label={`${label} 자주 쓰는 주소`} value={savedChoice[prefix]} disabled={savedAddresses.isPending || savedAddresses.isError || !savedAddresses.data?.length} placeholder="직접 입력 (기본)" hint={savedAddresses.isPending ? '저장한 주소를 불러오는 중이에요.' : !savedAddresses.isError && !savedAddresses.data?.length ? '입력한 주소를 저장하면 여기서 불러올 수 있어요.' : undefined} options={(savedAddresses.data ?? []).map((item) => ({ value: String(item.id), label: `${item.name} · ${item.address}${item.detailAddress ? ` ${item.detailAddress}` : ''}` }))} onChange={(e) => applySavedAddress(prefix, e.target.value)} />
                       {savedChoice[prefix] ? <Button type="button" variant="ghost" size="sm" className="mb-1" loading={removeAddress.isPending} onClick={() => removeAddress.mutate({ prefix, id: Number(savedChoice[prefix]) })}>저장 해제</Button> : null}
                     </div>
                     {savedAddresses.isError ? <div className="mt-2"><ErrorText>저장한 주소를 불러오지 못했어요.</ErrorText><Button type="button" variant="ghost" size="sm" onClick={() => void savedAddresses.refetch()}>다시 불러오기</Button></div> : null}
                   </div>
-                  {sites.length > 0 ? (
-                    <SelectField
-                      label="어디서"
-                      required
-                      placeholder="이전에 쓴 곳에서 고르기"
-                      options={siteOptions}
-                      error={errorOf(`${prefix}Site`)}
-                      {...register(`${prefix}Site`, { onChange: () => { setSavedChoice((s) => ({ ...s, [prefix]: '' })); setSavedNotice((s) => ({ ...s, [prefix]: null })) }, validate: (val) => val !== '' || `${label}를 골라 주세요.` })}
-                    />
-                  ) : null}
-                  {isNewSite(chosen) ? (
-                    <>
-                      <Field label="이름" required maxLength={100} placeholder="평택 포승 물류센터" error={errorOf(`${prefix}Name`)} {...siteText(prefix, 'Name', '이름')} />
-                      <div className="flex items-start gap-2">
-                        <Field className="min-w-0 flex-1" label="주소" required readOnly placeholder="주소 검색으로 선택해 주세요" error={errorOf(`${prefix}Address`)} {...siteText(prefix, 'Address', '주소')} />
-                        <Button type="button" variant="secondary" className="mt-6" onClick={() => setSearchingSite(prefix)}>주소 검색</Button>
-                      </div>
+                  <Field label="이름" required maxLength={100} placeholder="평택 포승 물류센터" error={errorOf(`${prefix}Name`)} {...siteText(prefix, 'Name', '이름')} />
+                  <div className="flex items-start gap-2">
+                    <Field className="min-w-0 flex-1" label="주소" required readOnly placeholder="주소 검색으로 선택해 주세요" error={errorOf(`${prefix}Address`)} {...siteText(prefix, 'Address', '주소')} />
+                    <Button type="button" variant="secondary" className="mt-6" onClick={() => setSearchingSite(prefix)}>주소 검색</Button>
+                  </div>
 
-                      <Field label="상세주소 (선택)" error={errorOf(`${prefix}DetailAddress`)} placeholder="동·호수, 물류센터 진입로 등" maxLength={100} {...register(`${prefix}DetailAddress`)} />
-                      <input type="hidden" {...siteCoord(prefix, 'Lat', -90, 90)} />
-                      <input type="hidden" {...siteCoord(prefix, 'Lng', -180, 180)} />
-                      <div aria-live="polite" className="text-[13px]">
-                        {locating[prefix] ? <p role="status" className="text-ink-sub">선택한 주소의 위치를 확인하고 있어요.</p> : locationError[prefix] ? (
-                          <div><ErrorText>{locationError[prefix]}</ErrorText><Button type="button" variant="secondary" size="sm" className="mt-2" onClick={() => void locateAddress(prefix, getValues(`${prefix}Address`))}>위치 다시 조회</Button></div>
-                        ) : watch(`${prefix}Lat`) && watch(`${prefix}Lng`) ? <p className="text-status-green">위치를 확인했어요.</p> : errorOf(`${prefix}Lat`) || errorOf(`${prefix}Lng`) ? <ErrorText>주소 검색으로 위치를 확인해 주세요.</ErrorText> : <p className="text-ink-sub">주소를 선택하면 위치가 자동으로 입력돼요.</p>}
-                      </div>
-                    </>
-                  ) : null}
+                  <Field label="상세주소 (선택)" error={errorOf(`${prefix}DetailAddress`)} placeholder="동·호수, 물류센터 진입로 등" maxLength={100} {...register(`${prefix}DetailAddress`)} />
+                  <input type="hidden" {...siteCoord(prefix, 'Lat', -90, 90)} />
+                  <input type="hidden" {...siteCoord(prefix, 'Lng', -180, 180)} />
+                  <div aria-live="polite" className="text-[13px]">
+                    {locating[prefix] ? <p role="status" className="text-ink-sub">선택한 주소의 위치를 확인하고 있어요.</p> : locationError[prefix] ? (
+                      <div><ErrorText>{locationError[prefix]}</ErrorText><Button type="button" variant="secondary" size="sm" className="mt-2" onClick={() => void locateAddress(prefix, getValues(`${prefix}Address`))}>위치 다시 조회</Button></div>
+                    ) : watch(`${prefix}Lat`) && watch(`${prefix}Lng`) ? <p className="text-status-green">위치를 확인했어요.</p> : errorOf(`${prefix}Lat`) || errorOf(`${prefix}Lng`) ? <ErrorText>주소 검색으로 위치를 확인해 주세요.</ErrorText> : <p className="text-ink-sub">주소를 선택하면 위치가 자동으로 입력돼요.</p>}
+                  </div>
                   <div className="border-t border-line/70 pt-3">
                     <Button type="button" variant="ghost" size="sm" loading={saveAddress.isPending && saveAddress.variables?.prefix === prefix} disabled={locating[prefix] || removeAddress.isPending || (saveAddress.isPending && saveAddress.variables?.prefix !== prefix)} onClick={() => saveCurrentAddress(prefix)}>☆ 자주 쓰는 주소에 저장</Button>
                     {savedNotice[prefix] ? <p role="status" className="mt-1 text-[12.5px] text-status-green">{savedNotice[prefix]}</p> : null}
