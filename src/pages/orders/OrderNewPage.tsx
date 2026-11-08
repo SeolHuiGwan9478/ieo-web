@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router'
 import { fareFor, feeRateOf, ordersApi, type CreateOrderRequest, type OrderSite } from '../../api/orders'
 import { driversApi } from '../../api/people'
 import { ApiError } from '../../api/client'
-import { addressesApi } from '../../api/addresses'
+import { addressesApi, savedAddressesApi, type SavedAddress, type SaveAddressInput } from '../../api/addresses'
 import { AddressSearch } from '../../components/AddressSearch'
 import type { PostcodeResult } from '../../lib/postcode'
 import { BODY_TYPES, CARGO_CATEGORIES, CONFIRM_MODE, CONSIGNMENT, LOADING_METHODS, PAYMENT_TYPES, TONNAGES } from '../../api/types'
@@ -119,11 +119,37 @@ export function OrderNewPage() {
   const { me } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [savedChoice, setSavedChoice] = useState({ pickup: '', dropoff: '' })
+  const [savedNotice, setSavedNotice] = useState<Record<SitePrefix, string | null>>({ pickup: null, dropoff: null })
+  const [savedError, setSavedError] = useState<Record<SitePrefix, string | null>>({ pickup: null, dropoff: null })
   const [searchingSite, setSearchingSite] = useState<SitePrefix | null>(null)
   const [locating, setLocating] = useState({ pickup: false, dropoff: false })
   const [locationError, setLocationError] = useState<Record<SitePrefix, string | null>>({ pickup: null, dropoff: null })
   const requestVersion = useRef({ pickup: 0, dropoff: 0 })
   useEffect(() => () => { requestVersion.current.pickup++; requestVersion.current.dropoff++ }, [])
+
+  const savedKey = ['saved-addresses', me?.id] as const
+  const savedAddresses = useQuery({ queryKey: savedKey, queryFn: savedAddressesApi.list, enabled: Boolean(me) })
+  const saveAddress = useMutation({
+    mutationFn: ({ body }: { prefix: SitePrefix; body: SaveAddressInput }) => savedAddressesApi.save(body),
+    onSuccess: (saved, { prefix }) => {
+      queryClient.setQueryData<SavedAddress[]>(savedKey, (old = []) => [saved, ...old.filter((item) => item.id !== saved.id)])
+      setSavedChoice((s) => ({ ...s, [prefix]: String(saved.id) }))
+      setSavedNotice((s) => ({ ...s, [prefix]: '자주 쓰는 주소에 저장했어요.' }))
+      setSavedError((s) => ({ ...s, [prefix]: null }))
+    },
+    onError: (e, { prefix }) => setSavedError((s) => ({ ...s, [prefix]: e instanceof ApiError ? e.message : '주소를 저장하지 못했어요. 서버 연결을 확인해 주세요.' })),
+  })
+  const removeAddress = useMutation({
+    mutationFn: ({ id }: { prefix: SitePrefix; id: number }) => savedAddressesApi.remove(id),
+    onSuccess: (_, { prefix, id }) => {
+      queryClient.setQueryData<SavedAddress[]>(savedKey, (old = []) => old.filter((item) => item.id !== id))
+      setSavedChoice((s) => ({ pickup: s.pickup === String(id) ? '' : s.pickup, dropoff: s.dropoff === String(id) ? '' : s.dropoff }))
+      setSavedNotice((s) => ({ ...s, [prefix]: '저장을 해제했어요. 작성 중인 주소는 유지돼요.' }))
+      setSavedError((s) => ({ ...s, [prefix]: null }))
+    },
+    onError: (e, { prefix }) => setSavedError((s) => ({ ...s, [prefix]: e instanceof ApiError ? e.message : '저장 해제를 완료하지 못했어요.' })),
+  })
 
   // 이전 오더의 상하차지를 고를 수 있게
   const recent = useQuery({ queryKey: ['orders', { status: '', page: 0, size: 50 }], queryFn: () => ordersApi.list({ status: '', page: 0, size: 50 }) })
@@ -198,6 +224,9 @@ export function OrderNewPage() {
   const selectAddress = useCallback((result: PostcodeResult) => {
     if (!searchingSite) return
     const prefix = searchingSite
+    setSavedChoice((s) => ({ ...s, [prefix]: '' }))
+    setSavedNotice((s) => ({ ...s, [prefix]: null }))
+    setSavedError((s) => ({ ...s, [prefix]: null }))
     const address = (result.userSelectedType === 'R' ? result.roadAddress : result.jibunAddress) || result.address
     setValue(`${prefix}Address`, address, { shouldDirty: true, shouldValidate: true })
     setValue(`${prefix}DetailAddress`, '')
@@ -208,6 +237,43 @@ export function OrderNewPage() {
     setSearchingSite(null)
     void locateAddress(prefix, address)
   }, [searchingSite, getValues, setValue, clearErrors, locateAddress])
+  const applySavedAddress = (prefix: SitePrefix, id: string) => {
+    const saved = savedAddresses.data?.find((item) => String(item.id) === id)
+    setSavedChoice((s) => ({ ...s, [prefix]: id }))
+    if (!saved) return
+    requestVersion.current[prefix]++
+    setLocating((s) => ({ ...s, [prefix]: false }))
+    setLocationError((s) => ({ ...s, [prefix]: null }))
+    setSearchingSite(null)
+    setValue(`${prefix}Site`, NEW_SITE, { shouldDirty: true, shouldValidate: true })
+    for (const [field, value] of Object.entries({ Name: saved.name, Address: saved.address, DetailAddress: saved.detailAddress, Lat: String(saved.lat), Lng: String(saved.lng) })) {
+      setValue(`${prefix}${field}` as keyof FormValues, value, { shouldDirty: true, shouldValidate: true })
+    }
+    clearErrors([`${prefix}Name`, `${prefix}Address`, `${prefix}DetailAddress`, `${prefix}Lat`, `${prefix}Lng`])
+    setSavedError((s) => ({ ...s, [prefix]: null }))
+    setSavedNotice((s) => ({ ...s, [prefix]: '저장한 주소와 상세주소를 불러왔어요.' }))
+  }
+
+  const saveCurrentAddress = (prefix: SitePrefix) => {
+    const chosen = getValues(`${prefix}Site`)
+    const recentSite = !isNewSite(chosen) ? sites.find((site) => String(site.id) === chosen) : undefined
+    const name = (recentSite?.name ?? getValues(`${prefix}Name`)).trim()
+    const address = (recentSite?.address ?? getValues(`${prefix}Address`)).trim()
+    const detailAddress = recentSite ? '' : getValues(`${prefix}DetailAddress`).trim()
+    const latText = recentSite ? String(recentSite.lat) : getValues(`${prefix}Lat`)
+    const lngText = recentSite ? String(recentSite.lng) : getValues(`${prefix}Lng`)
+    if (!name || !address || !latText || !lngText || locating[prefix]) {
+      setSavedError((s) => ({ ...s, [prefix]: '이름을 입력하고 주소 검색으로 위치를 확인한 뒤 저장해 주세요.' }))
+      return
+    }
+    if ([address, detailAddress].filter(Boolean).join(' ').length > 200) {
+      setSavedError((s) => ({ ...s, [prefix]: '기본 주소와 상세주소를 합쳐 200자 이내로 입력해 주세요.' }))
+      return
+    }
+    setSavedNotice((s) => ({ ...s, [prefix]: null }))
+    setSavedError((s) => ({ ...s, [prefix]: null }))
+    saveAddress.mutate({ prefix, body: { name, address, detailAddress, lat: Number(latText), lng: Number(lngText) } })
+  }
   const pickupSite = watch('pickupSite')
   const dropoffSite = watch('dropoffSite')
   const pickupDate = watch('pickupDate')
@@ -371,6 +437,13 @@ export function OrderNewPage() {
             return (
               <Card key={prefix} title={label}>
                 <div className="space-y-3.5">
+                  <div className="rounded-xl bg-canvas/70 p-3">
+                    <div className="flex items-end gap-2">
+                      <SelectField className="min-w-0 flex-1" label="자주 쓰는 주소" aria-label={`${label} 자주 쓰는 주소`} value={savedChoice[prefix]} disabled={savedAddresses.isPending || savedAddresses.isError || !savedAddresses.data?.length} placeholder={savedAddresses.isPending ? '불러오는 중…' : savedAddresses.data?.length ? '저장한 주소 선택' : '아래에서 주소를 입력하고 저장해 주세요'} options={(savedAddresses.data ?? []).map((item) => ({ value: String(item.id), label: `${item.name} · ${item.address}${item.detailAddress ? ` ${item.detailAddress}` : ''}` }))} onChange={(e) => applySavedAddress(prefix, e.target.value)} />
+                      {savedChoice[prefix] ? <Button type="button" variant="ghost" size="sm" className="mb-1" loading={removeAddress.isPending} onClick={() => removeAddress.mutate({ prefix, id: Number(savedChoice[prefix]) })}>저장 해제</Button> : null}
+                    </div>
+                    {savedAddresses.isError ? <div className="mt-2"><ErrorText>저장한 주소를 불러오지 못했어요.</ErrorText><Button type="button" variant="ghost" size="sm" onClick={() => void savedAddresses.refetch()}>다시 불러오기</Button></div> : null}
+                  </div>
                   {sites.length > 0 ? (
                     <SelectField
                       label="어디서"
@@ -378,7 +451,7 @@ export function OrderNewPage() {
                       placeholder="이전에 쓴 곳에서 고르기"
                       options={siteOptions}
                       error={errorOf(`${prefix}Site`)}
-                      {...register(`${prefix}Site`, { validate: (val) => val !== '' || `${label}를 골라 주세요.` })}
+                      {...register(`${prefix}Site`, { onChange: () => { setSavedChoice((s) => ({ ...s, [prefix]: '' })); setSavedNotice((s) => ({ ...s, [prefix]: null })) }, validate: (val) => val !== '' || `${label}를 골라 주세요.` })}
                     />
                   ) : null}
                   {isNewSite(chosen) ? (
@@ -399,6 +472,11 @@ export function OrderNewPage() {
                       </div>
                     </>
                   ) : null}
+                  <div className="border-t border-line/70 pt-3">
+                    <Button type="button" variant="ghost" size="sm" loading={saveAddress.isPending && saveAddress.variables?.prefix === prefix} disabled={locating[prefix] || removeAddress.isPending || (saveAddress.isPending && saveAddress.variables?.prefix !== prefix)} onClick={() => saveCurrentAddress(prefix)}>☆ 자주 쓰는 주소에 저장</Button>
+                    {savedNotice[prefix] ? <p role="status" className="mt-1 text-[12.5px] text-status-green">{savedNotice[prefix]}</p> : null}
+                    {savedError[prefix] ? <div className="mt-1"><ErrorText>{savedError[prefix]}</ErrorText></div> : null}
+                  </div>
                 </div>
               </Card>
             )

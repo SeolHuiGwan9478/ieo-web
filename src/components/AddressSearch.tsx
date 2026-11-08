@@ -57,12 +57,16 @@ export function AddressSearch({ onSelect, onClose }: { onSelect: (result: Postco
   }, [])
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-strong/40 px-4 py-12" onClick={onClose}>
-      <div ref={dialog} role="dialog" aria-modal="true" aria-label="주소 검색" className="relative w-full max-w-[500px] rounded-xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <button ref={closeButton} type="button" className="absolute -top-10 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-white text-ink-mid shadow-sm hover:bg-canvas" aria-label="주소 검색 닫기" onClick={onClose}><Icon name="close" className="h-5 w-5" /></button>
-        {loading ? <p role="status" className="absolute inset-0 flex items-center justify-center text-[13px] text-ink-sub">주소 검색을 불러오는 중이에요.</p> : null}
-        {error ? <div role="alert" className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-5"><ErrorText>{error}</ErrorText><Button type="button" size="sm" variant="secondary" onClick={() => setAttempt((v) => v + 1)}>다시 시도</Button></div> : null}
-        <div ref={container} className="h-[min(520px,calc(100dvh-96px))] overflow-hidden rounded-xl bg-white" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-strong/40 p-4" onClick={onClose}>
+      <div ref={dialog} role="dialog" aria-modal="true" aria-label="주소 검색" className="w-full max-w-[536px] rounded-2xl bg-white p-3 shadow-xl sm:p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="relative overflow-hidden rounded-lg border border-line/70">
+          {loading ? <p role="status" className="absolute inset-0 flex items-center justify-center text-[13px] text-ink-sub">주소 검색을 불러오는 중이에요.</p> : null}
+          {error ? <div role="alert" className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-5"><ErrorText>{error}</ErrorText><Button type="button" size="sm" variant="secondary" onClick={() => setAttempt((v) => v + 1)}>다시 시도</Button></div> : null}
+          <div ref={container} className="h-[min(500px,calc(100dvh-128px))] overflow-hidden bg-white" />
+        </div>
+        <div className="flex justify-end pt-3">
+          <button ref={closeButton} type="button" className="flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-ink-mid hover:bg-canvas" aria-label="주소 검색 닫기" onClick={onClose}><Icon name="close" className="h-4 w-4" />닫기</button>
+        </div>
       </div>
     </div>, document.body,
   )
