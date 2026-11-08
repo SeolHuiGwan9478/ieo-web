@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Clock, Fuel, Gauge, Navigation, QrCode, ReceiptText, Truck, Volume2 } from 'lucide-react'
+import { Clock, Gauge, Navigation, QrCode, ReceiptText, Truck, Volume2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Reveal } from '@/components/ui/reveal'
 
@@ -13,12 +13,15 @@ export interface BentoCopy {
   pleos: BentoText
   hub: BentoText
   hubNodes: { signal: string; navi: string; voice: string }
-  tmap: BentoText
   opinet: BentoText
   opinetHead: string
   opinetUnit: string
   /** 지역별 경유가 예시 */
   opinetRows: { region: string; price: string; note?: string }[]
+  /** 주선사 콘솔의 배차 요청 줄 예시 */
+  broker: BentoText
+  brokerRows: { route: string; driver: string }[]
+  brokerAction: string
   ribbon: BentoText
   motion: BentoText
 }
@@ -60,25 +63,7 @@ export function BentoFeatures({ copy }: { copy: BentoCopy }) {
           </div>
         </Tile>
 
-        <Tile delayMs={160} text={copy.tmap} wide>
-          <div className="relative flex h-full min-h-[130px] items-center justify-center px-4 pt-6">
-            <svg viewBox="0 0 260 110" className="absolute w-[92%] max-w-[260px] text-border" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-              <g transform="rotate(-8 130 55)">
-                <ellipse cx="130" cy="55" rx="124" ry="44" />
-                {moving && (
-                  <circle r="5" fill="#FF6C37" stroke="none">
-                    <animateMotion dur="6s" repeatCount="indefinite" path="M6 55a124 44 0 1 0 248 0a124 44 0 1 0-248 0" />
-                  </circle>
-                )}
-              </g>
-            </svg>
-            <img src="/logos/tmap.svg" alt="TMAP MOBILITY" className="relative w-[62%] max-w-[165px]" />
-          </div>
-        </Tile>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Tile delayMs={0} text={copy.opinet} titleFirst>
+        <Tile delayMs={160} text={copy.opinet} titleFirst wide>
           <div className="mx-5 mt-5 rounded-t-xl bg-background pb-2 text-left ring-1 ring-border">
             <div className="flex items-center justify-between border-b border-border px-4 py-2.5 text-[13px] text-muted-foreground">
               <span className="flex items-center gap-2 font-medium text-foreground">
@@ -101,12 +86,32 @@ export function BentoFeatures({ copy }: { copy: BentoCopy }) {
           </div>
         </Tile>
 
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Tile delayMs={0} text={copy.broker} titleFirst>
+          <div className="mx-5 mt-5 rounded-t-xl bg-background text-left ring-1 ring-border">
+            <ul className="divide-y divide-border px-4">
+              {copy.brokerRows.map((row, i) => (
+                <li key={row.route} className="flex items-center justify-between gap-3 py-2.5">
+                  <span className="min-w-0">
+                    <span className="block truncate text-[14px] font-bold">{row.route}</span>
+                    <span className="block truncate text-[12px] text-muted-foreground">{row.driver}</span>
+                  </span>
+                  {/* 첫 줄은 확정된 모습, 나머지는 확정 전 */}
+                  <span className={cn('shrink-0 rounded-lg px-3 py-1.5 text-[12px] font-bold', i === 0 ? 'bg-status-green-bg text-status-green' : 'bg-orange-600 text-white')}>{copy.brokerAction}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Tile>
+
         <Tile delayMs={80} text={copy.ribbon}>
           <div className="flex h-full min-h-[130px] items-center justify-center gap-[3%] px-5 pt-7" aria-hidden="true">
             <Chip delayMs={0} className="-rotate-12 translate-y-2 bg-status-blue-bg text-status-blue"><Truck className="h-[45%] w-[45%]" /></Chip>
             <Chip delayMs={250} className="-rotate-6 bg-status-yellow-bg text-status-yellow"><Clock className="h-[45%] w-[45%]" /></Chip>
             <Chip delayMs={500} className="bg-orange-500 text-white"><QrCode className="h-[45%] w-[45%]" /></Chip>
-            <Chip delayMs={750} className="rotate-6 bg-status-green-bg text-status-green"><Fuel className="h-[45%] w-[45%]" /></Chip>
+            <Chip delayMs={750} className="rotate-6 bg-status-green-bg text-status-green"><Volume2 className="h-[45%] w-[45%]" /></Chip>
             <Chip delayMs={1000} className="translate-y-2 rotate-12 bg-foreground text-background"><ReceiptText className="h-[45%] w-[45%]" /></Chip>
           </div>
         </Tile>
