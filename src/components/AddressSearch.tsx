@@ -13,9 +13,9 @@ export function AddressSearch({ onSelect, onClose }: { onSelect: (result: Postco
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [contentHeight, setContentHeight] = useState(440)
   const [viewportHeight, setViewportHeight] = useState(() => window.visualViewport?.height ?? window.innerHeight)
-  const searchHeight = Math.min(contentHeight, Math.max(80, viewportHeight - 112))
+  // 검색 결과 수와 무관하게 같은 크기를 유지하고, 작은 화면에서만 높이를 제한한다.
+  const searchHeight = Math.min(500, Math.max(80, viewportHeight - 112))
 
   useEffect(() => {
     const resize = () => setViewportHeight(window.visualViewport?.height ?? window.innerHeight)
@@ -43,7 +43,6 @@ export function AddressSearch({ onSelect, onClose }: { onSelect: (result: Postco
         onresize: ({ height }) => {
           if (!active || !Number.isFinite(height) || height <= 0) return
           window.clearTimeout(readyTimeout)
-          setContentHeight(Math.ceil(height))
           setLoading(false)
           setError(null)
         },
