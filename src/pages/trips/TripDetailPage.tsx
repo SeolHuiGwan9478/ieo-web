@@ -1,10 +1,11 @@
+import { TripMap } from '../../components/TripMap'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
 import { publicPageUrl, tripsApi, type TripStop } from '../../api/trips'
 import { ApiError } from '../../api/client'
 import { PROOF_STATUS, TRIP_TONE, WAIT_STATUS } from '../../api/types'
 import { Card, DescList, ErrorText, Icon, Loading, PageHeader, Tag } from '../../components/ui'
-import { formatDateTime, formatMinutes, formatPhone, formatRelative, formatWon } from '../../lib/format'
+import { formatDateTime, formatMinutes, formatPhone, formatWon } from '../../lib/format'
 
 /** 운행 상세 (BRK-020, 021): 위치·ETA, 상하차지 도착·작업·이탈 시각, 대기 증빙, 전자인수증 */
 export function TripDetailPage() {
@@ -68,14 +69,7 @@ export function TripDetailPage() {
               ) : (
                 <p className="text-[14px] text-ink-mid">{t.location ? '상하차지에 머물러 있거나 길 안내 중이 아니라 도착 예정 시각이 없어요.' : t.locationVisible ? '차량 앱이 아직 위치를 보내지 않았어요. 출발하면 5분마다 들어와요.' : '단골 차주가 아니라 위치는 보이지 않고, 상태와 도착 예정만 보여요.'}</p>
               )}
-              {t.location ? (
-                <DescList
-                  items={[
-                    { label: '마지막 위치', value: <span className="tabular-nums">{t.location.lat.toFixed(5)}, {t.location.lng.toFixed(5)}</span> },
-                    { label: '잰 시각', value: `${formatDateTime(t.location.recordedAt, { seconds: true })} (${formatRelative(t.location.recordedAt)})` },
-                  ]}
-                />
-              ) : null}
+              <TripMap key={t.id} trip={t} />
             </Card>
           ) : null}
 

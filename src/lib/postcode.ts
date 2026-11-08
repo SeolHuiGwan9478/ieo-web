@@ -1,3 +1,5 @@
+import type { KakaoMaps } from './kakaoMaps'
+
 export interface PostcodeResult {
   address: string
   roadAddress: string
@@ -14,7 +16,7 @@ interface PostcodeConstructor {
 
 declare global {
   interface Window {
-    kakao?: { Postcode?: PostcodeConstructor }
+    kakao?: { Postcode?: PostcodeConstructor; maps?: KakaoMaps }
   }
 }
 
