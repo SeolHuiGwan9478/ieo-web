@@ -47,9 +47,33 @@ export function TripMap({ trip }: { trip: Trip }) {
       const content = document.createElement('div')
       content.textContent = label
       content.title = label
-      content.style.cssText = `padding:7px 10px;border-radius:12px;background:${color};color:white;font:600 12px/1.4 sans-serif;border:2px solid white;box-shadow:0 2px 8px #0003;white-space:nowrap;transform:translateY(${vehicle ? '-24px' : '-8px'})`
+      content.style.cssText = `padding:7px 10px;border-radius:12px;background:${color};color:white;font:600 12px/1.4 sans-serif;border:2px solid white;box-shadow:0 2px 8px #0003;white-space:nowrap;transform:translateY(${vehicle ? '-24px' : '-46px'})`
       const labelOverlay = new sdk.CustomOverlay({ map, position, content, yAnchor: 1, zIndex: index + 1 })
-      if (!vehicle) return [labelOverlay]
+      if (!vehicle) {
+        const marker = document.createElement('div')
+        marker.setAttribute('role', 'img')
+        marker.setAttribute('aria-label', `${label} 위치 핀`)
+        marker.style.cssText = 'width:32px;height:40px;pointer-events:none;filter:drop-shadow(0 2px 3px #0003)'
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+        svg.setAttribute('viewBox', '0 0 32 40')
+        svg.setAttribute('width', '32')
+        svg.setAttribute('height', '40')
+        svg.setAttribute('aria-hidden', 'true')
+        const pin = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+        pin.setAttribute('d', 'M16 39C13 34 2 23 2 15a14 14 0 0 1 28 0c0 8-11 19-14 24Z')
+        pin.setAttribute('fill', color)
+        pin.setAttribute('stroke', 'white')
+        pin.setAttribute('stroke-width', '2')
+        const center = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+        center.setAttribute('cx', '16')
+        center.setAttribute('cy', '15')
+        center.setAttribute('r', '5')
+        center.setAttribute('fill', 'white')
+        svg.append(pin, center)
+        marker.append(svg)
+        const pinOverlay = new sdk.CustomOverlay({ map, position, content: marker, yAnchor: 1, zIndex: index + 1 })
+        return [labelOverlay, pinOverlay]
+      }
       // 화면상 위치를 강조하는 원형 표시이며 GPS 정확도 반경을 뜻하지 않는다.
       const marker = document.createElement('div')
       marker.setAttribute('role', 'img')
