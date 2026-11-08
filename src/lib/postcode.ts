@@ -7,7 +7,7 @@ export interface PostcodeResult {
 }
 
 interface PostcodeConstructor {
-  new (options: { oncomplete: (result: PostcodeResult) => void; width: string; height: number | string }): {
+  new (options: { oncomplete: (result: PostcodeResult) => void; onresize?: (size: { width: number; height: number }) => void; width: string; height: number | string }): {
     embed: (element: HTMLElement) => void
   }
 }

@@ -13,16 +13,42 @@ export function AddressSearch({ onSelect, onClose }: { onSelect: (result: Postco
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [contentHeight, setContentHeight] = useState(440)
+  const [viewportHeight, setViewportHeight] = useState(() => window.visualViewport?.height ?? window.innerHeight)
+  const searchHeight = Math.min(contentHeight, Math.max(80, viewportHeight - 112))
+
+  useEffect(() => {
+    const resize = () => setViewportHeight(window.visualViewport?.height ?? window.innerHeight)
+    window.addEventListener('resize', resize)
+    window.visualViewport?.addEventListener('resize', resize)
+    return () => {
+      window.removeEventListener('resize', resize)
+      window.visualViewport?.removeEventListener('resize', resize)
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
+    let readyTimeout: number | undefined
     setError(null)
     setLoading(true)
     container.current?.replaceChildren()
     loadPostcode().then((Postcode) => {
       if (!active || !container.current) return
-      new Postcode({ oncomplete: (result) => { if (active) onSelect(result) }, width: '100%', height: '100%' }).embed(container.current)
-      setLoading(false)
+      readyTimeout = window.setTimeout(() => {
+        if (active) { setLoading(false); setError('주소 검색 화면을 불러오지 못했어요. 다시 시도해 주세요.') }
+      }, 15_000)
+      new Postcode({
+        oncomplete: (result) => { if (active) onSelect(result) },
+        onresize: ({ height }) => {
+          if (!active || !Number.isFinite(height) || height <= 0) return
+          window.clearTimeout(readyTimeout)
+          setContentHeight(Math.ceil(height))
+          setLoading(false)
+          setError(null)
+        },
+        width: '100%', height: '100%',
+      }).embed(container.current)
     }).catch((e: unknown) => {
       if (active) {
         setError(e instanceof Error ? e.message : '주소 검색을 불러오지 못했어요.')
@@ -30,7 +56,7 @@ export function AddressSearch({ onSelect, onClose }: { onSelect: (result: Postco
       }
     })
     const element = container.current
-    return () => { active = false; element?.replaceChildren() }
+    return () => { active = false; window.clearTimeout(readyTimeout); element?.replaceChildren() }
   }, [attempt, onSelect])
 
   useEffect(() => {
@@ -59,14 +85,15 @@ export function AddressSearch({ onSelect, onClose }: { onSelect: (result: Postco
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-strong/40 p-4" onClick={onClose}>
       <div ref={dialog} role="dialog" aria-modal="true" aria-label="주소 검색" className="w-full max-w-[536px] rounded-2xl bg-white p-3 shadow-xl sm:p-4" onClick={(e) => e.stopPropagation()}>
-        <div className="relative overflow-hidden rounded-lg border border-line/70">
+        <div className="mb-1 flex h-8 justify-end">
+          <button ref={closeButton} type="button" className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-sub hover:bg-canvas hover:text-ink-mid" aria-label="주소 검색 닫기" onClick={onClose}><Icon name="close" className="h-5 w-5" /></button>
+        </div>
+        <div className="relative">
           {loading ? <p role="status" className="absolute inset-0 flex items-center justify-center text-[13px] text-ink-sub">주소 검색을 불러오는 중이에요.</p> : null}
           {error ? <div role="alert" className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-5"><ErrorText>{error}</ErrorText><Button type="button" size="sm" variant="secondary" onClick={() => setAttempt((v) => v + 1)}>다시 시도</Button></div> : null}
-          <div ref={container} className="h-[min(500px,calc(100dvh-128px))] overflow-hidden bg-white" />
+          <div ref={container} className="overflow-hidden bg-white" style={{ height: searchHeight }} />
         </div>
-        <div className="flex justify-end pt-3">
-          <button ref={closeButton} type="button" className="flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-ink-mid hover:bg-canvas" aria-label="주소 검색 닫기" onClick={onClose}><Icon name="close" className="h-4 w-4" />닫기</button>
-        </div>
+
       </div>
     </div>, document.body,
   )
