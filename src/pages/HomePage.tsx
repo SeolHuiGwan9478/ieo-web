@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ordersApi } from '../api/orders'
 import { tripsApi } from '../api/trips'
 import { driversApi } from '../api/people'
@@ -87,8 +87,8 @@ export function HomePage() {
 
 /* ───────── 기간별 실적 (대시보드) ───────── */
 
-/** 그래프 색. 건수는 오더(파랑)·완료(주황)·취소(보라), 금액은 청구(파랑)·지급(주황)·수수료(보라), 대기비(청록). dataviz 검증기 통과한 조합 */
-const COLOR = { order: '#2563EB', completed: '#F25A22', canceled: '#7C3AED', billed: '#2563EB', fare: '#F25A22', fee: '#7C3AED', waitFee: '#0891B2' }
+/** 건수는 오더·완료·취소, 금액은 중개비를 표시해요. */
+const COLOR = { order: '#2563EB', completed: '#F25A22', canceled: '#7C3AED', fee: '#7C3AED' }
 
 type Preset = { label: string; unit: DashboardUnit; days?: number; months?: number }
 const PRESETS: Preset[] = [
@@ -161,14 +161,11 @@ function DashboardSection() {
         <Loading rows={4} />
       ) : (
         <>
-          <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+          <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
             <Total label="오더 등록" value={`${data.total.orderCount}건`} color={COLOR.order} />
             <Total label="완료 운행" value={`${data.total.completedCount}건`} color={COLOR.completed} />
             <Total label="취소" value={`${data.total.canceledCount}건`} color={COLOR.canceled} />
-            <Total label="청구 합계" value={formatWon(data.total.billedTotal)} color={COLOR.billed} hint={`청구운임 적은 ${data.total.pricedCount}건`} />
-            <Total label="지급 합계" value={formatWon(data.total.fareTotal)} color={COLOR.fare} hint="완료 운행의 지급운임" />
-            <Total label="수수료" value={formatWon(data.total.feeTotal)} color={COLOR.fee} hint={feeRateLabel(data.total)} />
-            <Total label="대기비" value={formatWon(data.total.waitFeeTotal)} color={COLOR.waitFee} hint="대기 증빙으로 계산" />
+            <Total label="중개비 합계" value={formatWon(data.total.feeTotal)} color={COLOR.fee} hint={`청구운임을 입력한 완료 운행 ${data.total.pricedCount}건`} />
           </div>
           <div className="grid gap-6 xl:grid-cols-2">
             <ChartBlock title="건수" description={`${data.unitLabel}별 오더 등록·완료 운행·취소`}>
@@ -185,34 +182,25 @@ function DashboardSection() {
                 </BarChart>
               </ResponsiveContainer>
             </ChartBlock>
-            <ChartBlock title="금액" description={`${data.unitLabel}별 청구·지급·수수료 (완료된 운행 기준)`}>
+            <ChartBlock title="중개비 실적" description={`${data.unitLabel}별 중개비 (완료 운행 기준 · 원)`}>
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={data.buckets} barGap={2} barCategoryGap="28%" margin={{ top: 8, right: 8, left: -4, bottom: 0 }}>
+                <LineChart data={data.buckets} margin={{ top: 8, right: 8, left: -4, bottom: 0 }}>
                   <CartesianGrid vertical={false} stroke="#EDEDED" />
                   <XAxis dataKey="start" tickFormatter={(v: string) => axisLabel(v, data.unit)} tick={{ fontSize: 11.5, fill: '#8B95A1' }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={24} />
                   <YAxis tickFormatter={shortWon} tick={{ fontSize: 11.5, fill: '#8B95A1' }} axisLine={false} tickLine={false} width={52} />
-                  <Tooltip cursor={{ fill: 'rgba(25,31,40,0.04)' }} content={<BucketTooltip unit={data.unit} kind="amount" />} />
-                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12.5, color: '#4E5968' }} />
-                  <Bar dataKey="billedTotal" name="청구" fill={COLOR.billed} radius={[4, 4, 0, 0]} maxBarSize={28} />
-                  <Bar dataKey="fareTotal" name="지급" fill={COLOR.fare} radius={[4, 4, 0, 0]} maxBarSize={28} />
-                  <Bar dataKey="feeTotal" name="수수료" fill={COLOR.fee} radius={[4, 4, 0, 0]} maxBarSize={28} />
-                </BarChart>
+                  <Tooltip cursor={{ stroke: '#D1D6DB', strokeDasharray: '4 4' }} content={<BucketTooltip unit={data.unit} kind="amount" />} />
+                  <Line type="linear" dataKey="feeTotal" name="중개비" stroke={COLOR.fee} strokeWidth={2.5} dot={{ r: 3, fill: COLOR.fee, stroke: '#FFFFFF', strokeWidth: 1.5 }} activeDot={{ r: 5 }} />
+                </LineChart>
               </ResponsiveContainer>
             </ChartBlock>
           </div>
           <p className="mt-4 text-[12.5px] text-ink-sub">
-            오더는 등록한 날, 완료·취소는 그 처리를 한 날로 세요. 청구는 화주에게 받는 돈, 지급은 차주에게 주는 돈, 수수료는 그 차이예요 (청구운임을 적은 오더만). 실제 입금·지급 완료는 아직 여기 없어요. 노선·상하차지·차주별 분석은 <Link to="/reports" className="font-semibold text-orange-700">리포트</Link>에서 봐요.
+            오더는 등록한 날, 완료·취소는 그 처리를 한 날로 세요. 중개비는 청구운임에서 차주 지급운임을 뺀 금액이며, 청구운임을 입력한 완료 운행만 집계해요. 실제 입금 기준은 아니에요. 노선·상하차지·차주별 분석은 <Link to="/reports" className="font-semibold text-orange-700">리포트</Link>에서 봐요.
           </p>
         </>
       )}
     </Card>
   )
-}
-
-/** 합계 칸의 수수료율: 수수료 ÷ 청구 합계 */
-function feeRateLabel(b: DashboardBucket) {
-  if (!b.billedTotal) return '청구운임 적은 오더 없음'
-  return `청구의 ${Math.round((b.feeTotal / b.billedTotal) * 1000) / 10}%`
 }
 
 function Total({ label, value, color, hint }: { label: string; value: string; color: string; hint?: string }) {
@@ -279,10 +267,7 @@ function BucketTooltip({ active, payload, unit, kind }: { active?: boolean; payl
           { label: '취소', value: `${b.canceledCount}건`, color: COLOR.canceled },
         ]
       : [
-          { label: '청구', value: formatWon(b.billedTotal), color: COLOR.billed },
-          { label: '지급', value: formatWon(b.fareTotal), color: COLOR.fare },
-          { label: '수수료', value: `${formatWon(b.feeTotal)}${b.billedTotal ? ` · ${Math.round((b.feeTotal / b.billedTotal) * 1000) / 10}%` : ''}`, color: COLOR.fee },
-          { label: '대기비', value: formatWon(b.waitFeeTotal), color: COLOR.waitFee },
+          { label: '중개비', value: formatWon(b.feeTotal), color: COLOR.fee },
         ]
   return (
     <div className="rounded-xl border border-line bg-white px-3 py-2.5 text-[12.5px] shadow-[0_4px_16px_rgba(25,31,40,0.08)]">
