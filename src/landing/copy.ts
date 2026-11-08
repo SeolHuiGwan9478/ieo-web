@@ -21,7 +21,7 @@ export interface LandingCopy {
   }
   showcase: { hint: string; tagline: string; off: string; label: string; tabs: { login: string; drive: string; wait: string; offer: string } }
   logos: { label: string; caption: string }
-  /** 카드 여섯 장 묶음. 설명은 실제 기능이고, TMAP은 아직 연동 전이라 '준비 중'으로 적는다. 경유가 숫자는 예시다 */
+  /** 카드 여섯 장 묶음. 설명은 실제 기능이고, 경유가 숫자와 배차 요청 줄은 예시다 */
   bento: BentoCopy & { title: string; subtitle: string }
   /** 제목은 두 줄(앞줄, 주황 강조 줄), 설명은 문장마다 한 줄로 끊는다 */
   intro: { titleLead: string; titleAccent: string; subtitle: string[]; console: string; note: string }
@@ -63,11 +63,10 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
     bento: {
       title: '이에오가 차 안에서 하는 일',
       subtitle: '차량 신호와 내비, 기름값 정보를 이어서 다음 짐까지 챙겨요.',
-      pleos: { title: '처음부터 Pleos Connect 위에서', body: '차량 화면에서 바로 돌아가요. 기어와 속도를 읽고 차량 내비와 음성을 써요.' },
-      hub: { title: '차가 알려 주는 대로 움직여요', body: '달릴 땐 음성으로만 알리고, 수락 창은 차가 섰을 때만 떠요.' },
+      pleos: { title: '처음부터 Pleos Connect 위에서', body: '차량 화면에서 바로 돌아가요. 기어와 속도를 읽고, 차량 내비와 음성 안내를 그대로 써요.' },
+      hub: { title: '차가 알려 주는 대로 움직여요', body: '달리는 동안엔 음성으로만 알려요. 수락 창은 차가 완전히 섰을 때만 떠요.' },
       hubNodes: { signal: '기어·속도', navi: '차량 내비', voice: '음성 안내' },
-      tmap: { title: 'TMAP 화물차 경로 연동 준비 중', body: '지금은 직선거리로 계산해요. 화물차가 다닐 수 있는 길 기준으로 바꿀 예정이에요.' },
-      opinet: { title: '기름값은 오피넷 지역 평균으로', body: '하차지 지역의 경유 평균가로 공차 기름값을 구해 실수익에서 빼요.' },
+      opinet: { title: '기름값은 오피넷 지역 평균으로', body: '하차지 지역의 경유 평균가로 공차 기름값을 계산해, 운임에서 뺀 실수익을 보여 줘요.' },
       opinetHead: '오늘 경유 평균',
       opinetUnit: '원/L',
       opinetRows: [
@@ -75,8 +74,15 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { region: '경기', price: '1,836', note: '6원 쌈' },
         { region: '경북', price: '1,829', note: '13원 쌈' },
       ],
-      ribbon: { title: '배차부터 장부까지 한 앱에서', body: '배차 요청, 대기 타이머, QR 인수증, 주유, 장부가 한 흐름으로 이어져요.' },
-      motion: { title: '운행에서 다음 운행으로', body: '운행 막바지에 하차지 근처의 다음 오더를 추천해요.' },
+      broker: { title: '주선사는 콘솔에서 확정해요', body: '차주가 수락한 배차 요청이 콘솔로 들어와요. 운행 현황, 대기 증빙, 인수증도 거기서 봐요.' },
+      brokerRows: [
+        { route: '평택 포승 → 대전 유성', driver: '김○○ · 5톤 카고' },
+        { route: '안산 반월 → 청주 오창', driver: '이○○ · 5톤 윙' },
+        { route: '인천 남동 → 부산 강서', driver: '박○○ · 11톤 카고' },
+      ],
+      brokerAction: '확정',
+      ribbon: { title: '배차부터 장부까지 한 앱에서', body: '배차 요청, 대기 타이머, QR 인수증, 음성 안내, 장부가 한 흐름으로 이어져요.' },
+      motion: { title: '운행에서 다음 운행으로', body: '운행이 끝나갈 때 하차지 근처의 다음 오더를 미리 추천해요.' },
     },
     intro: {
       titleLead: '짐 내리기 전에,',
@@ -147,11 +153,10 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
     bento: {
       title: 'What Ieo does in the cab',
       subtitle: 'It ties together vehicle signals, navigation and fuel prices to line up your next load.',
-      pleos: { title: 'Built on Pleos Connect from day one', body: 'It runs right on the vehicle screen, reading gear and speed and using the car navigation and voice.' },
-      hub: { title: 'It follows what the truck tells it', body: 'On the road it only speaks. The offer appears only once the truck has stopped.' },
+      pleos: { title: 'Built on Pleos Connect from day one', body: 'It runs right on the vehicle screen, reading gear and speed and using the car navigation and voice as they are.' },
+      hub: { title: 'It follows what the truck tells it', body: 'While you drive it only speaks. The offer appears only once the truck has come to a full stop.' },
       hubNodes: { signal: 'Gear & speed', navi: 'Car navigation', voice: 'Voice' },
-      tmap: { title: 'TMAP truck routes, coming soon', body: 'Distances are straight-line for now. We plan to switch to roads a truck can actually take.' },
-      opinet: { title: 'Fuel costs from Opinet regional averages', body: 'Empty-run fuel is priced at the diesel average near your drop-off and taken off your net.' },
+      opinet: { title: 'Fuel costs from Opinet regional averages', body: "Empty-run fuel is priced at the diesel average around your drop-off, then taken off the fare to show your net." },
       opinetHead: "Today's diesel average",
       opinetUnit: 'KRW/L',
       opinetRows: [
@@ -159,8 +164,15 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { region: 'Gyeonggi', price: '1,836', note: '6 lower' },
         { region: 'Gyeongbuk', price: '1,829', note: '13 lower' },
       ],
-      ribbon: { title: 'From dispatch to ledger in one app', body: 'Dispatch requests, the waiting timer, QR receipts, fuel and the ledger follow one flow.' },
-      motion: { title: 'From one haul to the next', body: 'Near the end of a trip, Ieo recommends the next order around your drop-off.' },
+      broker: { title: 'Brokers confirm from the console', body: 'Dispatch requests a driver accepts land in the console, along with live trips, waiting proof and receipts.' },
+      brokerRows: [
+        { route: 'Pyeongtaek → Daejeon', driver: 'Kim · 5t cargo' },
+        { route: 'Ansan → Cheongju', driver: 'Lee · 5t wing' },
+        { route: 'Incheon → Busan', driver: 'Park · 11t cargo' },
+      ],
+      brokerAction: 'Confirm',
+      ribbon: { title: 'From dispatch to ledger in one app', body: 'Dispatch requests, the waiting timer, QR receipts, voice guidance and the ledger follow one flow.' },
+      motion: { title: 'From one haul to the next', body: 'As a trip winds down, Ieo recommends the next order around your drop-off ahead of time.' },
     },
     intro: {
       titleLead: 'Before you unload,',
