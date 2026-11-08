@@ -238,7 +238,7 @@ export function Loading({ rows = 3 }: { rows?: number }) {
 
 export function Tabs<T extends string>({ value, onChange, items }: { value: T; onChange: (v: T) => void; items: { value: T; label: string; count?: number }[] }) {
   return (
-    <div className="mb-4 flex gap-1 rounded-xl border border-line bg-canvas p-1">
+    <div className="mb-4 flex overflow-hidden rounded-xl border border-line bg-canvas">
       {items.map((item) => {
         const active = item.value === value
         return (
@@ -246,7 +246,7 @@ export function Tabs<T extends string>({ value, onChange, items }: { value: T; o
             key={item.value}
             type="button"
             onClick={() => onChange(item.value)}
-            className={`flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg text-[14px] font-semibold transition ${
+            className={`flex h-9 flex-1 items-center justify-center gap-1.5 text-[14px] font-semibold transition ${
               active ? 'bg-white text-ink-strong shadow-[0_1px_2px_rgba(25,31,40,0.08)]' : 'text-ink-sub hover:text-ink-mid'
             }`}
           >
