@@ -48,13 +48,14 @@ export function TripMap({ trip }: { trip: Trip }) {
       content.textContent = label
       content.title = label
       content.style.cssText = `padding:7px 10px;border-radius:12px;background:${color};color:white;font:600 12px/1.4 sans-serif;border:2px solid white;box-shadow:0 2px 8px #0003;white-space:nowrap;transform:translateY(${vehicle ? '-24px' : '-46px'})`
-      const labelOverlay = new sdk.CustomOverlay({ map, position, content, yAnchor: 1, zIndex: index + 1 })
+      const labelOverlay = new sdk.CustomOverlay({ map, position, content, xAnchor: 0.5, yAnchor: 1, zIndex: index + 1 })
       if (!vehicle) {
         const marker = document.createElement('div')
         marker.setAttribute('role', 'img')
         marker.setAttribute('aria-label', `${label} 위치 핀`)
         marker.style.cssText = 'width:32px;height:40px;pointer-events:none;filter:drop-shadow(0 2px 3px #0003)'
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+        svg.style.display = 'block'
         svg.setAttribute('viewBox', '0 0 32 40')
         svg.setAttribute('width', '32')
         svg.setAttribute('height', '40')
@@ -71,7 +72,8 @@ export function TripMap({ trip }: { trip: Trip }) {
         center.setAttribute('fill', 'white')
         svg.append(pin, center)
         marker.append(svg)
-        const pinOverlay = new sdk.CustomOverlay({ map, position, content: marker, yAnchor: 1, zIndex: index + 1 })
+        // 핀 경로의 끝점 (16, 39)을 좌표에 맞춘다. 흰 테두리는 그 바깥에 그려진다.
+        const pinOverlay = new sdk.CustomOverlay({ map, position, content: marker, xAnchor: 0.5, yAnchor: 39 / 40, zIndex: index + 1 })
         return [labelOverlay, pinOverlay]
       }
       // 화면상 위치를 강조하는 원형 표시이며 GPS 정확도 반경을 뜻하지 않는다.
@@ -82,7 +84,7 @@ export function TripMap({ trip }: { trip: Trip }) {
       const dot = document.createElement('span')
       dot.style.cssText = `display:block;width:16px;height:16px;border:3px solid white;border-radius:50%;background:${color};box-shadow:0 1px 5px #0004;box-sizing:border-box`
       marker.append(dot)
-      const positionOverlay = new sdk.CustomOverlay({ map, position, content: marker, yAnchor: 0.5, zIndex: 4 })
+      const positionOverlay = new sdk.CustomOverlay({ map, position, content: marker, xAnchor: 0.5, yAnchor: 0.5, zIndex: 4 })
       return [labelOverlay, positionOverlay]
     })
     fit.current = () => { if (points.length) { map.relayout(); map.setBounds(bounds, 60, 80, 40, 80) } }

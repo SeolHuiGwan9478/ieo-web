@@ -10,7 +10,7 @@ export interface KakaoMaps {
   LatLng: new (lat: number, lng: number) => LatLng
   LatLngBounds: new () => MapBounds
   Map: new (element: HTMLElement, options: { center: LatLng; level: number }) => KakaoMap
-  CustomOverlay: new (options: { map: KakaoMap; position: LatLng; content: HTMLElement; yAnchor: number; zIndex: number }) => { setMap(map: KakaoMap | null): void }
+  CustomOverlay: new (options: { map: KakaoMap; position: LatLng; content: HTMLElement; xAnchor: number; yAnchor: number; zIndex: number }) => { setMap(map: KakaoMap | null): void }
 }
 
 let loading: Promise<KakaoMaps> | null = null
