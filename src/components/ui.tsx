@@ -238,7 +238,7 @@ export function Loading({ rows = 3 }: { rows?: number }) {
 
 export function Tabs<T extends string>({ value, onChange, items }: { value: T; onChange: (v: T) => void; items: { value: T; label: string; count?: number }[] }) {
   return (
-    <div className="mb-4 flex gap-1 rounded-xl bg-canvas p-1">
+    <div className="mb-4 flex gap-1 rounded-xl border border-line bg-canvas p-1">
       {items.map((item) => {
         const active = item.value === value
         return (
