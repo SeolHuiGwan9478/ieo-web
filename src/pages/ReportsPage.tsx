@@ -36,10 +36,10 @@ export function ReportsPage() {
         <UpgradeNotice feature="운행 데이터 리포트" />
       ) : (
         <>
-          <div className="mb-4 flex items-end gap-3">
-            <Field label="시작" type="date" value={period.from} onChange={(e) => setPeriod((p) => ({ ...p, from: e.target.value }))} className="w-44" />
-            <Field label="종료" type="date" value={period.to} onChange={(e) => setPeriod((p) => ({ ...p, to: e.target.value }))} className="w-44" />
-            <span className="pb-3 text-[12.5px] text-ink-sub">한국 날짜, 양 끝 포함, 최대 1년</span>
+          <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-3">
+            <Field label="시작" type="date" value={period.from} onChange={(e) => setPeriod((p) => ({ ...p, from: e.target.value }))} className="grid grid-cols-[auto_11rem] items-center gap-x-3 [&>span]:mb-0" />
+            <Field label="종료" type="date" value={period.to} onChange={(e) => setPeriod((p) => ({ ...p, to: e.target.value }))} className="grid grid-cols-[auto_11rem] items-center gap-x-3 [&>span]:mb-0" />
+            <span className="text-[12.5px] text-ink-sub">한국 날짜, 양 끝 포함, 최대 1년</span>
           </div>
           {tab === 'company' ? <CompanyTab period={period} /> : null}
           {tab === 'routes' ? <RoutesTab period={period} /> : null}
