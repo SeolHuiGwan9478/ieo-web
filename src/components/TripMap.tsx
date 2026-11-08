@@ -36,19 +36,30 @@ export function TripMap({ trip }: { trip: Trip }) {
     if (!instance) return
     const { sdk, map } = instance
     const points = [
-      { point: trip.pickup, label: '상차지', color: '#2563EB' },
-      { point: trip.dropoff, label: '하차지 · 목적지', color: '#F25A22' },
-      { point: location, label: `차량 · ${trip.plateNumber}`, color: stale ? '#6B7280' : '#7C3AED' },
+      { point: trip.pickup, label: '상차지', vehicle: false, color: '#2563EB' },
+      { point: trip.dropoff, label: '하차지 · 목적지', vehicle: false, color: '#F25A22' },
+      { point: location, label: `차량 · ${trip.plateNumber}`, vehicle: true, color: stale ? '#6B7280' : '#7C3AED' },
     ].filter((item) => validCoordinate(item.point))
     const bounds = new sdk.LatLngBounds()
-    const overlays = points.map(({ point, label, color }, index) => {
+    const overlays = points.flatMap(({ point, label, color, vehicle }, index) => {
       const position = new sdk.LatLng(point!.lat, point!.lng)
       bounds.extend(position)
       const content = document.createElement('div')
       content.textContent = label
       content.title = label
-      content.style.cssText = `padding:7px 10px;border-radius:12px;background:${color};color:white;font:600 12px/1.4 sans-serif;border:2px solid white;box-shadow:0 2px 8px #0003;white-space:nowrap;transform:translateY(-8px)`
-      return new sdk.CustomOverlay({ map, position, content, yAnchor: 1, zIndex: index + 1 })
+      content.style.cssText = `padding:7px 10px;border-radius:12px;background:${color};color:white;font:600 12px/1.4 sans-serif;border:2px solid white;box-shadow:0 2px 8px #0003;white-space:nowrap;transform:translateY(${vehicle ? '-24px' : '-8px'})`
+      const labelOverlay = new sdk.CustomOverlay({ map, position, content, yAnchor: 1, zIndex: index + 1 })
+      if (!vehicle) return [labelOverlay]
+      // 화면상 위치를 강조하는 원형 표시이며 GPS 정확도 반경을 뜻하지 않는다.
+      const marker = document.createElement('div')
+      marker.setAttribute('role', 'img')
+      marker.setAttribute('aria-label', stale ? '차량 마지막 수신 위치' : '차량 위치')
+      marker.style.cssText = `width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:${color}26;box-shadow:0 0 0 1px ${color}40;pointer-events:none`
+      const dot = document.createElement('span')
+      dot.style.cssText = `display:block;width:16px;height:16px;border:3px solid white;border-radius:50%;background:${color};box-shadow:0 1px 5px #0004;box-sizing:border-box`
+      marker.append(dot)
+      const positionOverlay = new sdk.CustomOverlay({ map, position, content: marker, yAnchor: 0.5, zIndex: 4 })
+      return [labelOverlay, positionOverlay]
     })
     fit.current = () => { if (points.length) { map.relayout(); map.setBounds(bounds, 60, 80, 40, 80) } }
     if (!fitted.current && points.length) { fit.current(); fitted.current = true }
