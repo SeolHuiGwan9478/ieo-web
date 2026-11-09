@@ -124,6 +124,8 @@ export const ordersApi = {
     api<OrderPage>('/api/broker/orders', { query: { status: params.status || undefined, page: params.page, size: params.size } }),
   get: (orderId: number) => api<Order>(`/api/broker/orders/${orderId}`),
   create: (body: CreateOrderRequest) => api<Order>('/api/broker/orders', { method: 'POST', body }),
+  /** 오더 수정 (BRK-010). 모집 중이면 전부, 확정 뒤에는 거래처·청구운임만 (아니면 409 ORDER_409_LOCKED) */
+  update: (orderId: number, body: CreateOrderRequest) => api<Order>(`/api/broker/orders/${orderId}`, { method: 'PUT', body }),
   applicants: (orderId: number) => api<Applicant[]>(`/api/broker/orders/${orderId}/requests`),
   confirm: (orderId: number, requestId: number) =>
     api<Order>(`/api/broker/orders/${orderId}/requests/${requestId}/confirm`, { method: 'POST' }),

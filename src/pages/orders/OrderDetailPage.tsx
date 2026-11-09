@@ -6,7 +6,7 @@ import { ordersApi, type Applicant } from '../../api/orders'
 import { ApiError } from '../../api/client'
 import type { CancelReason } from '../../api/types'
 import { CANCEL_REASONS, CONFIRM_MODE, CONSIGNMENT, ORDER_STATUS, REQUEST_STATUS } from '../../api/types'
-import { Button, Card, DescList, ErrorText, Loading, Modal, PageHeader, SelectField, Table, Tag, TextareaField } from '../../components/ui'
+import { Button, Card, DescList, ErrorText, LinkButton, Loading, Modal, PageHeader, SelectField, Table, Tag, TextareaField } from '../../components/ui'
 import { formatDateTime, formatRelative, formatWon } from '../../lib/format'
 
 /** 오더 상세: 정보 + 배차 요청한 차주 + 확정·취소·내리기 (DSP-020~032) */
@@ -57,6 +57,14 @@ export function OrderDetailPage() {
         back={{ to: '/orders', label: '오더' }}
         action={
           <>
+            <LinkButton to={`/orders/new?from=${o.id}`} variant="secondary">
+              복사해서 올리기
+            </LinkButton>
+            {o.status !== 'CLOSED' ? (
+              <LinkButton to={`/orders/${o.id}/edit`} variant="secondary">
+                {o.status === 'ASSIGNED' ? '거래처·청구운임 수정' : '수정'}
+              </LinkButton>
+            ) : null}
             {o.status === 'OPEN' ? (
               <Button variant="secondary" loading={close.isPending} onClick={() => confirmDialog('이 오더를 내릴까요? 대기 중인 요청은 모두 마감돼요.') && close.mutate()}>
                 오더 내리기

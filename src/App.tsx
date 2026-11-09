@@ -61,6 +61,7 @@ export default function App() {
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/new" element={<OrderNewPage />} />
         <Route path="/orders/:orderId" element={<OrderDetailPage />} />
+        <Route path="/orders/:orderId/edit" element={<OrderNewPage mode="edit" />} />
         <Route path="/trips" element={<TripsPage />} />
         <Route path="/trips/:tripId" element={<TripDetailPage />} />
         <Route path="/drivers" element={<DriversPage />} />

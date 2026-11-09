@@ -141,7 +141,7 @@ export function TextareaField({ label, error, hint, className = '', ...rest }: T
 }
 
 /** 고를 것이 몇 개 안 될 때 드롭다운 대신 쓰는 칩. 고른 것만 주황 테두리 */
-export function ChipGroup<T extends string>({ label, value, onChange, options, hint, error, required, className = '' }: {
+export function ChipGroup<T extends string>({ label, value, onChange, options, hint, error, required, disabled, className = '' }: {
   label: string
   value: T
   onChange: (v: T) => void
@@ -149,6 +149,7 @@ export function ChipGroup<T extends string>({ label, value, onChange, options, h
   hint?: string
   error?: string
   required?: boolean
+  disabled?: boolean
   className?: string
 }) {
   return (
@@ -165,8 +166,9 @@ export function ChipGroup<T extends string>({ label, value, onChange, options, h
               key={o.value}
               type="button"
               aria-pressed={active}
+              disabled={disabled}
               onClick={() => onChange(o.value)}
-              className={`h-10 rounded-xl border px-3.5 text-[14px] font-semibold transition ${
+              className={`h-10 rounded-xl border px-3.5 text-[14px] font-semibold transition disabled:pointer-events-none disabled:opacity-40 ${
                 active ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-line bg-white text-ink-mid hover:bg-canvas'
               }`}
             >

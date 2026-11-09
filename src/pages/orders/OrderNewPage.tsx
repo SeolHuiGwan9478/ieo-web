@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router'
-import { fareFor, feeRateOf, ordersApi, type CreateOrderRequest } from '../../api/orders'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
+import { fareFor, feeRateOf, ordersApi, type CreateOrderRequest, type Order } from '../../api/orders'
+import type { MyBroker } from '../../api/broker'
 import { driversApi } from '../../api/people'
 import { ApiError } from '../../api/client'
 import { addressesApi, savedAddressesApi, type SavedAddress, type SaveAddressInput } from '../../api/addresses'
@@ -10,23 +11,26 @@ import { AddressSearch } from '../../components/AddressSearch'
 import type { PostcodeResult } from '../../lib/postcode'
 import { BODY_TYPES, CARGO_CATEGORIES, CONFIRM_MODE, CONSIGNMENT, LOADING_METHODS, PAYMENT_TYPES, TONNAGES } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
-import { Button, Card, ChipGroup, ErrorText, Field, PageHeader, SelectField } from '../../components/ui'
+import { Button, Card, ChipGroup, ErrorText, Field, LinkButton, Loading, PageHeader, SelectField } from '../../components/ui'
 import { formatDateTime, formatWon, localInputValue } from '../../lib/format'
 
 /**
- * 오더 등록 (DSP-001). 서버가 요구하는 항목은 그대로 두고 타이핑을 줄인다.
+ * 오더 등록·수정·복사 (DSP-001, BRK-010, DSP-004). 서버가 요구하는 항목은 그대로 두고 타이핑을 줄인다.
  * - 상하차지: 직접 입력을 기본으로 하고 자주 쓰는 주소는 별도 드롭다운으로 불러온다
  * - 시간: 상차 날짜·시각 하나와 "상차 가능 폭", "하차 기한"을 고르면 세 시각이 계산된다
  * - 운임: 주선사가 일하는 순서대로. 화주 계약가(청구운임)와 수수료율을 적으면 차주 지급운임이 채워진다. 지급운임만 적어도 된다
  * - 결제·운송 형태·확정 방식·거래처: 회사 기본값으로 접어 둔다
+ * - 수정(/orders/:id/edit): 모집 중이면 전부 고치고, 확정 뒤에는 거래처·청구운임만 (나머지는 잠근다)
+ * - 복사(/orders/new?from=id): 지난 오더의 조건을 그대로 채우고 상차 날짜만 오늘·내일로 옮긴다
  */
-type PickupWindow = 'EXACT' | 'HOURS_2' | 'SAME_DAY'
+type PickupWindow = 'EXACT' | 'HOURS_2' | 'SAME_DAY' | 'CUSTOM'
 type DropoffDeadline = 'SAME_DAY' | 'NEXT_MORNING' | 'CUSTOM'
 
 const PICKUP_WINDOWS: { value: PickupWindow; label: string }[] = [
   { value: 'EXACT', label: '정시' },
   { value: 'HOURS_2', label: '2시간 안' },
   { value: 'SAME_DAY', label: '당일 아무 때나' },
+  { value: 'CUSTOM', label: '직접 정하기' },
 ]
 const DROPOFF_DEADLINES: { value: DropoffDeadline; label: string }[] = [
   { value: 'SAME_DAY', label: '당일' },
@@ -50,6 +54,8 @@ interface FormValues {
   /** HH:mm */
   pickupTime: string
   pickupWindow: PickupWindow
+  /** 상차 마감을 직접 정할 때만 (datetime-local) */
+  pickupUntil: string
   dropoffDeadline: DropoffDeadline
   /** 하차 기한을 직접 정할 때만 (datetime-local) */
   dropoffBy: string
@@ -74,16 +80,121 @@ interface FormValues {
 
 type SitePrefix = 'pickup' | 'dropoff'
 
-/** 상차 시작·마감. 정시는 30분 폭, 당일은 자정 직전까지. 날짜나 시각이 비어 있으면 null */
-function pickupRange(date: string, time: string, window: PickupWindow): { from: Date; until: Date } | null {
+/** 상차 시작·마감. 정시는 30분 폭, 당일은 자정 직전까지, 직접 정하면 적은 시각. 비어 있거나 잘못됐으면 null */
+function pickupRange(date: string, time: string, window: PickupWindow, custom: string): { from: Date; until: Date } | null {
   if (!date || !time) return null
   const from = new Date(`${date}T${time}`)
   if (Number.isNaN(from.getTime())) return null
+  if (window === 'CUSTOM') {
+    if (!custom) return null
+    const until = new Date(custom)
+    return Number.isNaN(until.getTime()) ? null : { from, until }
+  }
   const until = new Date(from)
   if (window === 'EXACT') until.setMinutes(until.getMinutes() + 30)
   else if (window === 'HOURS_2') until.setHours(until.getHours() + 2)
   else until.setHours(23, 59, 0, 0)
   return { from, until }
+}
+
+/** 저장된 상차 시작·마감이 어느 칩인지. 맞는 칩이 없으면 직접 정하기 */
+function detectPickupWindow(from: Date, until: Date): PickupWindow {
+  const diff = until.getTime() - from.getTime()
+  if (diff === 30 * 60_000) return 'EXACT'
+  if (diff === 2 * 3600_000) return 'HOURS_2'
+  const endOfDay = new Date(from)
+  endOfDay.setHours(23, 59, 0, 0)
+  return until.getTime() === endOfDay.getTime() ? 'SAME_DAY' : 'CUSTOM'
+}
+
+/** 저장된 하차 기한이 어느 칩인지 */
+function detectDeadline(from: Date, by: Date): DropoffDeadline {
+  const sameDay = new Date(from)
+  sameDay.setHours(23, 59, 0, 0)
+  if (by.getTime() === sameDay.getTime()) return 'SAME_DAY'
+  const nextMorning = new Date(from)
+  nextMorning.setDate(nextMorning.getDate() + 1)
+  nextMorning.setHours(9, 0, 0, 0)
+  return by.getTime() === nextMorning.getTime() ? 'NEXT_MORNING' : 'CUSTOM'
+}
+
+/**
+ * 기존 오더를 폼 값으로. 수정은 그대로, 복사는 상차 날짜만 오늘(한 시간 안이면 내일)로 옮기고 시각과 조건은 그대로 둔다.
+ * 상세주소는 따로 저장되지 않아 주소 한 칸에 들어 있다
+ */
+function valuesFromOrder(order: Order, me: MyBroker | undefined, copy: boolean): FormValues {
+  const from = new Date(order.pickupFrom)
+  const until = new Date(order.pickupUntil)
+  const by = new Date(order.dropoffBy)
+  let start = from
+  if (copy) {
+    start = new Date()
+    start.setHours(from.getHours(), from.getMinutes(), 0, 0)
+    if (start.getTime() < Date.now() + 3600_000) start.setDate(start.getDate() + 1)
+  }
+  const shift = start.getTime() - from.getTime()
+  const window = detectPickupWindow(from, until)
+  const deadline = detectDeadline(from, by)
+  const billing = order.billing
+  return {
+    pickupName: order.pickup.name,
+    pickupAddress: order.pickup.address,
+    pickupDetailAddress: '',
+    pickupLat: String(order.pickup.lat),
+    pickupLng: String(order.pickup.lng),
+    dropoffName: order.dropoff.name,
+    dropoffAddress: order.dropoff.address,
+    dropoffDetailAddress: '',
+    dropoffLat: String(order.dropoff.lat),
+    dropoffLng: String(order.dropoff.lng),
+    pickupDate: localInputValue(start).slice(0, 10),
+    pickupTime: localInputValue(start).slice(11, 16),
+    pickupWindow: window,
+    pickupUntil: window === 'CUSTOM' ? localInputValue(new Date(until.getTime() + shift)) : '',
+    dropoffDeadline: deadline,
+    dropoffBy: deadline === 'CUSTOM' ? localInputValue(new Date(by.getTime() + shift)) : '',
+    cargoCategory: order.cargoCategory,
+    cargoType: order.cargoType,
+    weightKg: String(order.weightKg),
+    tonnage: order.tonnage,
+    bodyType: order.bodyType,
+    loadingMethod: order.loadingMethod,
+    billedFare: billing?.billedFare != null ? String(billing.billedFare) : '',
+    feeRate: billing?.feeRate != null ? String(billing.feeRate) : me?.defaultFeeRate ? String(me.defaultFeeRate) : '',
+    fare: String(order.fare),
+    customerName: billing?.customerName ?? '',
+    paymentType: order.paymentType,
+    expectedPaymentDays: String(order.expectedPaymentDays),
+    consignmentType: order.consignmentType,
+    confirmMode: order.confirmMode,
+    targetDriverId: order.targetDriverId ? String(order.targetDriverId) : '',
+  }
+}
+
+/** 확정 뒤 수정: 차주가 본 조건은 저장된 그대로 보내고, 거래처·청구운임만 폼에서 가져온다 */
+function requestFromOrder(order: Order, v: FormValues): CreateOrderRequest {
+  return {
+    pickup: { siteId: order.pickup.id },
+    dropoff: { siteId: order.dropoff.id },
+    pickupFrom: order.pickupFrom,
+    pickupUntil: order.pickupUntil,
+    dropoffBy: order.dropoffBy,
+    cargoCategory: order.cargoCategory,
+    cargoType: order.cargoType,
+    weightKg: order.weightKg,
+    tonnage: order.tonnage,
+    bodyType: order.bodyType,
+    loadingMethod: order.loadingMethod,
+    fare: order.fare,
+    billedFare: v.billedFare !== '' ? Number(v.billedFare) : null,
+    feeRate: null,
+    customerName: v.customerName.trim() || null,
+    paymentType: order.paymentType,
+    expectedPaymentDays: order.expectedPaymentDays,
+    consignmentType: order.consignmentType,
+    confirmMode: order.confirmMode,
+    targetDriverId: order.targetDriverId,
+  }
 }
 
 /** 하차 기한. 당일은 상차일 자정 직전, 다음날은 오전 9시, 직접 정하면 적은 시각 */
@@ -109,10 +220,22 @@ function defaultPickupStart() {
   return d
 }
 
-export function OrderNewPage() {
+export function OrderNewPage({ mode = 'create' }: { mode?: 'create' | 'edit' }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { me } = useAuth()
+  const params = useParams()
+  const [search] = useSearchParams()
+  /** 고칠 오더. 등록 화면이면 null */
+  const editingId = mode === 'edit' && params.orderId ? Number(params.orderId) : null
+  /** 복사해 올릴 원본 오더 (/orders/new?from=id) */
+  const copyingId = mode === 'create' && search.get('from') ? Number(search.get('from')) : null
+  const sourceId = editingId ?? copyingId
+  const source = useQuery({ queryKey: ['orders', sourceId], queryFn: () => ordersApi.get(sourceId as number), enabled: sourceId !== null })
+  /** 대기 중 요청이 있거나 배차가 확정된 오더: 거래처·청구운임만 고칠 수 있고 나머지는 잠근다 (서버도 막는다) */
+  const assigned = editingId !== null && source.data?.status === 'ASSIGNED'
+  const waitingRequests = editingId !== null && !assigned ? (source.data?.pendingRequestCount ?? 0) : 0
+  const locked = assigned || waitingRequests > 0
   const [error, setError] = useState<string | null>(null)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [savedChoice, setSavedChoice] = useState({ pickup: '', dropoff: '' })
@@ -150,7 +273,7 @@ export function OrderNewPage() {
   const drivers = useQuery({ queryKey: ['drivers'], queryFn: driversApi.list })
 
   const start = useMemo(defaultPickupStart, [])
-  const { register, handleSubmit, watch, setValue, getValues, clearErrors, formState, setError: setFieldError } = useForm<FormValues>({
+  const { register, handleSubmit, watch, setValue, getValues, clearErrors, reset, formState, setError: setFieldError } = useForm<FormValues>({
     defaultValues: {
       pickupName: '',
       pickupAddress: '',
@@ -165,6 +288,7 @@ export function OrderNewPage() {
       pickupDate: localInputValue(start).slice(0, 10),
       pickupTime: localInputValue(start).slice(11, 16),
       pickupWindow: 'HOURS_2',
+      pickupUntil: '',
       dropoffDeadline: 'SAME_DAY',
       dropoffBy: '',
       cargoCategory: 'GENERAL',
@@ -258,6 +382,7 @@ export function OrderNewPage() {
   const pickupDate = watch('pickupDate')
   const pickupTime = watch('pickupTime')
   const pickupWindow = watch('pickupWindow')
+  const pickupUntilCustom = watch('pickupUntil')
   const deadlineChoice = watch('dropoffDeadline')
   const dropoffBy = watch('dropoffBy')
   const cargoCategory = watch('cargoCategory')
@@ -275,10 +400,19 @@ export function OrderNewPage() {
   // 청구운임과 수수료율을 적으면 지급운임을 채운다. 지급운임을 직접 고친 뒤에는 건드리지 않는다
   const [fareTouched, setFareTouched] = useState(false)
   useEffect(() => {
-    if (fareTouched || billedFare === '' || feeRate === '') return
+    if (locked || fareTouched || billedFare === '' || feeRate === '') return
     const computed = fareFor(Number(billedFare), Number(feeRate))
     setValue('fare', computed === null ? '' : String(computed), { shouldValidate: formState.isSubmitted })
-  }, [billedFare, feeRate, fareTouched, setValue, formState.isSubmitted])
+  }, [locked, billedFare, feeRate, fareTouched, setValue, formState.isSubmitted])
+
+  // 기존 오더를 불러오면 폼을 그 값으로 채운다 (오더마다 한 번). 저장된 지급운임을 지키려고 자동 계산은 멈춘다
+  const loadedFrom = useRef<number | null>(null)
+  useEffect(() => {
+    if (!source.data || sourceId === null || loadedFrom.current === sourceId) return
+    loadedFrom.current = sourceId
+    reset(valuesFromOrder(source.data, me ?? undefined, copyingId !== null))
+    setFareTouched(true)
+  }, [source.data, sourceId, copyingId, me, reset])
   const fee = billedFare !== '' && fare !== '' ? Number(billedFare) - Number(fare) : null
   const actualFeeRate = fee === null ? null : feeRateOf(Number(fare), Number(billedFare))
   const fareHint =
@@ -295,7 +429,7 @@ export function OrderNewPage() {
     if (cargoCategory === 'COLD') setValue('bodyType', 'REFRIGERATED')
   }, [cargoCategory, setValue])
 
-  const range = pickupRange(pickupDate, pickupTime, pickupWindow)
+  const range = pickupRange(pickupDate, pickupTime, pickupWindow, pickupUntilCustom)
   const deadline = range ? dropoffDeadlineAt(range.from, deadlineChoice, dropoffBy) : null
   const timeSummary = range
     ? `${formatDateTime(range.from.toISOString())}부터 ${formatDateTime(range.until.toISOString())}까지 상차${
@@ -313,25 +447,29 @@ export function OrderNewPage() {
     .filter(Boolean)
     .join(' · ')
 
-  const create = useMutation({
-    mutationFn: (body: CreateOrderRequest) => ordersApi.create(body),
-    onSuccess: (order) => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] })
-      navigate(`/orders/${order.id}`)
-    },
-    onError: (e) => {
-      if (e instanceof ApiError) {
-        e.fieldErrors.forEach((f) => setFieldError(f.field as keyof FormValues, { message: f.reason }))
-        setError(e.message)
-      } else setError('서버와 연결할 수 없어요.')
-    },
-  })
+  const saved = (order: Order) => {
+    queryClient.invalidateQueries({ queryKey: ['orders'] })
+    navigate(`/orders/${order.id}`)
+  }
+  const failed = (e: unknown) => {
+    if (e instanceof ApiError) {
+      e.fieldErrors.forEach((f) => setFieldError(f.field as keyof FormValues, { message: f.reason }))
+      setError(e.message)
+    } else setError('서버와 연결할 수 없어요.')
+  }
+  const create = useMutation({ mutationFn: (body: CreateOrderRequest) => ordersApi.create(body), onSuccess: saved, onError: failed })
+  const update = useMutation({ mutationFn: (body: CreateOrderRequest) => ordersApi.update(editingId as number, body), onSuccess: saved, onError: failed })
+  const submitting = create.isPending || update.isPending
 
   const siteInput = (prefix: SitePrefix, v: FormValues) => {
     return { site: { name: v[`${prefix}Name`].trim(), address: [v[`${prefix}Address`].trim(), v[`${prefix}DetailAddress`].trim()].filter(Boolean).join(' '), lat: Number(v[`${prefix}Lat`]), lng: Number(v[`${prefix}Lng`]) } }
   }
 
   const onSubmit = (v: FormValues) => {
+    if (locked && source.data) {
+      update.mutate(requestFromOrder(source.data, v))
+      return
+    }
     for (const prefix of ['pickup', 'dropoff'] as const) {
       if (!v[`${prefix}Lat`] || !v[`${prefix}Lng`] || locating[prefix]) {
         return setFieldError(`${prefix}Address`, { message: '주소 검색으로 위치를 확인해 주세요.' })
@@ -340,13 +478,21 @@ export function OrderNewPage() {
         return setFieldError(`${prefix}DetailAddress`, { message: '기본 주소와 상세주소를 합쳐 200자 이내로 입력해 주세요.' })
       }
     }
-    const pickup = pickupRange(v.pickupDate, v.pickupTime, v.pickupWindow)
-    if (!pickup) return setFieldError('pickupTime', { message: '상차 날짜와 시각을 골라 주세요.' })
-    if (pickup.until <= pickup.from) return setFieldError('pickupTime', { message: '당일 상차는 자정 전 시각이어야 해요.' })
+    const pickup = pickupRange(v.pickupDate, v.pickupTime, v.pickupWindow, v.pickupUntil)
+    if (!pickup) {
+      return v.pickupWindow === 'CUSTOM' && v.pickupDate && v.pickupTime
+        ? setFieldError('pickupUntil', { message: '상차 마감을 골라 주세요.' })
+        : setFieldError('pickupTime', { message: '상차 날짜와 시각을 골라 주세요.' })
+    }
+    if (pickup.until <= pickup.from) {
+      return v.pickupWindow === 'CUSTOM'
+        ? setFieldError('pickupUntil', { message: '상차 마감은 상차 시작 뒤여야 해요.' })
+        : setFieldError('pickupTime', { message: '당일 상차는 자정 전 시각이어야 해요.' })
+    }
     const by = dropoffDeadlineAt(pickup.from, v.dropoffDeadline, v.dropoffBy)
     if (!by) return setFieldError('dropoffBy', { message: '하차 기한을 골라 주세요.' })
     if (by <= pickup.from) return setFieldError('dropoffBy', { message: '하차 기한은 상차 시작 뒤여야 해요.' })
-    create.mutate({
+    const body: CreateOrderRequest = {
       pickup: siteInput('pickup', v),
       dropoff: siteInput('dropoff', v),
       pickupFrom: pickup.from.toISOString(),
@@ -367,7 +513,9 @@ export function OrderNewPage() {
       consignmentType: v.consignmentType,
       confirmMode: v.targetDriverId ? 'SELECT' : v.confirmMode,
       targetDriverId: v.targetDriverId ? Number(v.targetDriverId) : null,
-    })
+    }
+    if (editingId !== null) update.mutate(body)
+    else create.mutate(body)
   }
 
   const num = (field: keyof FormValues, label: string, opts: { min?: number; max?: number; onChange?: () => void } = {}) =>
@@ -394,18 +542,71 @@ export function OrderNewPage() {
       },
     })
 
+  const editing = editingId !== null
+  const header = (
+    <PageHeader
+      title={editing ? '오더 수정' : '오더 등록'}
+      description={
+        assigned
+          ? '배차가 확정된 오더예요. 거래처와 청구운임만 고칠 수 있어요. 차주 화면의 조건을 바꾸려면 배차를 취소한 뒤 다시 모집하세요.'
+          : waitingRequests > 0
+            ? `배차 요청 ${waitingRequests}건이 기다리고 있어요. 차주가 본 조건은 그대로 두고 거래처와 청구운임만 고칠 수 있어요. 요청은 10분 안에 확정하지 않으면 만료되니 그 뒤에 고치세요.`
+            : editing && source.data?.status === 'CLOSED'
+              ? '내린 오더예요. 복사해서 새로 올릴 수 있어요.'
+              : editing
+            ? '고친 내용은 차주 화면에 바로 반영돼요.'
+            : copyingId !== null
+              ? '지난 오더를 복사했어요. 상차 날짜와 운임을 확인하고 올리세요.'
+              : '상하차지, 상차 시간, 화물, 운임만 적으면 차주 화면에 올라가요. 결제와 배차 방식은 회사 기본값을 써요.'
+      }
+      back={editing ? { to: `/orders/${editingId}`, label: '오더 상세' } : { to: '/orders', label: '오더' }}
+    />
+  )
+  if (sourceId !== null && source.isPending) {
+    return (
+      <>
+        {header}
+        <Loading rows={6} />
+      </>
+    )
+  }
+  if (sourceId !== null && (source.isError || !source.data)) {
+    return (
+      <>
+        {header}
+        <ErrorText>{source.error instanceof ApiError ? source.error.message : '오더를 불러오지 못했어요.'}</ErrorText>
+      </>
+    )
+  }
+  if (editing && source.data?.status === 'CLOSED') {
+    return (
+      <>
+        {header}
+        <Card>
+          <p className="text-[14px] text-ink-mid">내린 오더는 고칠 수 없어요. 같은 조건으로 새로 올리려면 복사하세요.</p>
+          <div className="mt-4">
+            <LinkButton to={`/orders/new?from=${editingId}`}>복사해서 올리기</LinkButton>
+          </div>
+        </Card>
+      </>
+    )
+  }
   return (
     <>
-      <PageHeader
-        title="오더 등록"
-        description="상하차지, 상차 시간, 화물, 운임만 적으면 차주 화면에 올라가요. 결제와 배차 방식은 회사 기본값을 써요."
-        back={{ to: '/orders', label: '오더' }}
-      />
+      {header}
       {searchingSite ? <AddressSearch onSelect={selectAddress} onClose={() => setSearchingSite(null)} /> : null}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <div className="grid gap-5 lg:grid-cols-2">
           {(['pickup', 'dropoff'] as const).map((prefix) => {
             const label = prefix === 'pickup' ? '상차지' : '하차지'
+            if (locked) {
+              return (
+                <Card key={prefix} title={label}>
+                  <p className="font-semibold text-ink-strong">{watch(`${prefix}Name`)}</p>
+                  <p className="mt-0.5 text-[13px] text-ink-sub">{watch(`${prefix}Address`)}</p>
+                </Card>
+              )
+            }
             return (
               <Card key={prefix} title={label}>
                 <div className="space-y-3.5">
@@ -444,30 +645,37 @@ export function OrderNewPage() {
         <Card title="상차 시간">
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="상차 날짜" required type="date" error={errorOf('pickupDate')} {...register('pickupDate', { required: '날짜를 골라 주세요.' })} />
-              <Field label="상차 시각" required type="time" step={1800} error={errorOf('pickupTime')} {...register('pickupTime', { required: '시각을 골라 주세요.' })} />
+              <Field label="상차 날짜" required type="date" disabled={locked} error={errorOf('pickupDate')} {...register('pickupDate', { required: '날짜를 골라 주세요.' })} />
+              <Field label="상차 시각" required type="time" step={1800} disabled={locked} error={errorOf('pickupTime')} {...register('pickupTime', { required: '시각을 골라 주세요.' })} />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <ChipGroup label="상차 가능 폭" value={pickupWindow} options={PICKUP_WINDOWS} onChange={(v) => setValue('pickupWindow', v)} hint="정시는 30분 안에 상차를 시작해야 해요." />
-              <ChipGroup label="하차 기한" value={deadlineChoice} options={DROPOFF_DEADLINES} onChange={(v) => setValue('dropoffDeadline', v)} />
+              <ChipGroup label="상차 가능 폭" value={pickupWindow} options={PICKUP_WINDOWS} disabled={locked} onChange={(v) => setValue('pickupWindow', v)} hint="정시는 30분 안에 상차를 시작해야 해요." />
+              <ChipGroup label="하차 기한" value={deadlineChoice} options={DROPOFF_DEADLINES} disabled={locked} onChange={(v) => setValue('dropoffDeadline', v)} />
             </div>
-            {deadlineChoice === 'CUSTOM' ? (
-              <Field label="하차 기한" required type="datetime-local" className="sm:max-w-xs" error={errorOf('dropoffBy')} {...register('dropoffBy', { required: '하차 기한을 골라 주세요.' })} />
-            ) : (
-              errorOf('dropoffBy') && <ErrorText>{errorOf('dropoffBy')}</ErrorText>
-            )}
+            {pickupWindow === 'CUSTOM' || deadlineChoice === 'CUSTOM' || errorOf('dropoffBy') ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {pickupWindow === 'CUSTOM' ? (
+                  <Field label="상차 마감" required type="datetime-local" disabled={locked} error={errorOf('pickupUntil')} {...register('pickupUntil', { required: '상차 마감을 골라 주세요.' })} />
+                ) : null}
+                {deadlineChoice === 'CUSTOM' ? (
+                  <Field label="하차 기한" required type="datetime-local" disabled={locked} error={errorOf('dropoffBy')} {...register('dropoffBy', { required: '하차 기한을 골라 주세요.' })} />
+                ) : (
+                  errorOf('dropoffBy') && <ErrorText>{errorOf('dropoffBy')}</ErrorText>
+                )}
+              </div>
+            ) : null}
             {timeSummary ? <p className="rounded-xl bg-canvas px-3.5 py-2.5 text-[13.5px] font-medium text-ink-mid">{timeSummary}</p> : null}
           </div>
         </Card>
 
         <Card title="화물과 차량">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="품목" required placeholder="파레트 12개 (식품)" hint="인수증에 그대로 적혀요." error={errorOf('cargoType')} {...register('cargoType', { required: '품목을 입력해 주세요.' })} />
-            <Field label="무게 (kg)" required inputMode="numeric" placeholder="4500" error={errorOf('weightKg')} {...num('weightKg', '무게', { min: 1, max: 50000 })} />
-            <SelectField label="화물 종류" required options={CARGO_CATEGORIES} hint="냉동·냉장을 고르면 차종도 냉동·냉장으로 바뀌어요." {...register('cargoCategory')} />
-            <SelectField label="톤수" required options={TONNAGES} {...register('tonnage')} />
-            <SelectField label="차종" required options={BODY_TYPES} {...register('bodyType')} />
-            <SelectField label="상하차 방식" required options={LOADING_METHODS} {...register('loadingMethod')} />
+            <Field label="품목" required placeholder="파레트 12개 (식품)" hint="인수증에 그대로 적혀요." disabled={locked} error={errorOf('cargoType')} {...register('cargoType', { required: '품목을 입력해 주세요.' })} />
+            <Field label="무게 (kg)" required inputMode="numeric" placeholder="4500" disabled={locked} error={errorOf('weightKg')} {...num('weightKg', '무게', { min: 1, max: 50000 })} />
+            <SelectField label="화물 종류" required options={CARGO_CATEGORIES} hint="냉동·냉장을 고르면 차종도 냉동·냉장으로 바뀌어요." disabled={locked} {...register('cargoCategory')} />
+            <SelectField label="톤수" required options={TONNAGES} disabled={locked} {...register('tonnage')} />
+            <SelectField label="차종" required options={BODY_TYPES} disabled={locked} {...register('bodyType')} />
+            <SelectField label="상하차 방식" required options={LOADING_METHODS} disabled={locked} {...register('loadingMethod')} />
           </div>
         </Card>
 
@@ -492,6 +700,7 @@ export function OrderNewPage() {
               step={0.1}
               placeholder="10"
               hint="청구운임 기준이에요. 회사 기본값을 미리 채워요."
+              disabled={locked}
               error={errorOf('feeRate')}
               {...register('feeRate', { onChange: () => setFareTouched(false), min: { value: 0, message: '0~99.9%' }, max: { value: 99.9, message: '0~99.9%' } })}
             />
@@ -500,7 +709,8 @@ export function OrderNewPage() {
               required
               inputMode="numeric"
               placeholder="540000"
-              hint={fareHint}
+              hint={assigned ? '확정된 운임이라 바꿀 수 없어요.' : locked ? '요청이 기다리는 동안은 바꿀 수 없어요.' : fareHint}
+              disabled={locked}
               error={errorOf('fare')}
               {...num('fare', '지급운임', { min: 0, max: 100_000_000, onChange: () => setFareTouched(true) })}
             />
@@ -517,25 +727,27 @@ export function OrderNewPage() {
         >
           {advancedOpen ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <SelectField label="결제 방식" required options={PAYMENT_TYPES.map((p) => ({ value: p.value, label: `${p.label} — ${p.hint}` }))} {...register('paymentType')} />
+              <SelectField label="결제 방식" required options={PAYMENT_TYPES.map((p) => ({ value: p.value, label: `${p.label} — ${p.hint}` }))} disabled={locked} {...register('paymentType')} />
               {paymentType === 'RECEIPT' ? (
                 <Field
                   label="지급 예정 (인수증 전달 뒤 일수)"
                   inputMode="numeric"
                   hint={`비우면 회사 정산 주기 ${me?.settlementDays ?? 30}일`}
+                  disabled={locked}
                   error={errorOf('expectedPaymentDays')}
                   {...register('expectedPaymentDays')}
                 />
               ) : null}
-              <SelectField label="운송 형태" options={Object.entries(CONSIGNMENT).map(([value, label]) => ({ value, label }))} {...register('consignmentType')} />
+              <SelectField label="운송 형태" options={Object.entries(CONSIGNMENT).map(([value, label]) => ({ value, label }))} disabled={locked} {...register('consignmentType')} />
               <SelectField
                 label="지정 차주"
                 placeholder="오더 마켓에 공개 (누구나 요청)"
                 options={(drivers.data ?? []).map((d) => ({ value: String(d.driverUserId), label: `${d.name} · ${d.plateNumber ?? '차량 없음'}` }))}
                 hint="단골 차주에게만 지정할 수 있어요. 지정하면 그 차주에게만 보여요."
+                disabled={locked}
                 {...register('targetDriverId')}
               />
-              <SelectField label="확정 방식" options={Object.entries(CONFIRM_MODE).map(([value, label]) => ({ value, label }))} disabled={Boolean(targetDriverId)} {...register('confirmMode')} />
+              <SelectField label="확정 방식" options={Object.entries(CONFIRM_MODE).map(([value, label]) => ({ value, label }))} disabled={locked || Boolean(targetDriverId)} {...register('confirmMode')} />
               <Field label="거래처 (화주)" placeholder="대한제강" maxLength={50} hint="주선사만 봐요." error={errorOf('customerName')} {...register('customerName')} />
             </div>
           ) : (
@@ -548,11 +760,11 @@ export function OrderNewPage() {
 
         <ErrorText>{error}</ErrorText>
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={() => navigate('/orders')}>
+          <Button type="button" variant="secondary" onClick={() => navigate(editing ? `/orders/${editingId}` : '/orders')}>
             취소
           </Button>
-          <Button type="submit" loading={create.isPending} disabled={locating.pickup || locating.dropoff}>
-            오더 올리기
+          <Button type="submit" loading={submitting} disabled={!locked && (locating.pickup || locating.dropoff)}>
+            {editing ? '수정 저장' : '오더 올리기'}
           </Button>
         </div>
       </form>
