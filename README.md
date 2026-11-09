@@ -4,6 +4,7 @@
 서버는 [ieo-server](https://github.com/SeolHuiGwan9478/ieo-server), 기획·요구사항은 [ieo-app/docs](https://github.com/SeolHuiGwan9478/ieo-app/tree/main/docs).
 
 - 인계 문서: `ieo-app/docs/design/03_어드민_인계.md`, 서버 작업 기록: `06_주선사_인계_작업내용.md`
+- 운영자 페이지의 차주 서류 심사: [docs/운영자_서류심사_인계.md](docs/운영자_서류심사_인계.md)
 
 ## 실행
 
