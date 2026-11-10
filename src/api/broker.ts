@@ -26,6 +26,8 @@ export interface MyBroker {
   position: MemberPosition
   positionLabel: string
   plan: PlanInfo
+  /** 회사 서류(사업자등록증·운송주선사업 허가증)가 모두 승인됐는지. 아니면 오더를 올릴 수 없다 (07 인계서 13장) */
+  verified: boolean
   createdAt: string
 }
 

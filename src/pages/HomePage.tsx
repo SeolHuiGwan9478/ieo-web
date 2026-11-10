@@ -8,6 +8,7 @@ import { driversApi } from '../api/people'
 import { reportsApi } from '../api/reports'
 import { DASHBOARD_UNITS, dashboardApi, type DashboardBucket, type DashboardParams, type DashboardUnit } from '../api/dashboard'
 import { useAuth } from '../auth/AuthContext'
+import { CompanyVerificationNotice } from '../components/CompanyVerificationNotice'
 import { Card, Icon, LinkButton, Loading, PageHeader, Stat, Table, Tag } from '../components/ui'
 import { formatDateTime, formatMinutes, formatPercent, formatWon, todayIso } from '../lib/format'
 import { ORDER_STATUS, TRIP_TONE } from '../api/types'
@@ -29,11 +30,14 @@ export function HomePage() {
         title={me.name}
         description="오늘 배차 상황과 기간별 실적을 한눈에 봐요."
         action={
-          <LinkButton to="/orders/new">
-            <Icon name="plus" className="h-4 w-4" /> 오더 등록
-          </LinkButton>
+          me.verified ? (
+            <LinkButton to="/orders/new">
+              <Icon name="plus" className="h-4 w-4" /> 오더 등록
+            </LinkButton>
+          ) : null
         }
       />
+      <CompanyVerificationNotice />
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="모집 중인 오더" value={openOrders.data?.totalCount ?? '…'} tone="blue" sub={pendingRequests > 0 ? `배차 요청 ${pendingRequests}건 대기` : '대기 중인 요청 없음'} />

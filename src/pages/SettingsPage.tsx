@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { brokerApi, type BrokerPlan } from '../api/broker'
@@ -42,9 +42,14 @@ const DOCUMENTS_QUERY_KEY = ['brokers', 'documents'] as const
  * 담당자 누구나 올릴 수 있다. 심사 중인 서류는 결과가 나올 때까지 다시 못 올리고, 반려·승인 뒤에는 새로 올린다
  */
 function CompanyDocumentsCard() {
-  const { me } = useAuth()
+  const { me, refreshMe } = useAuth()
   const query = useQuery({ queryKey: DOCUMENTS_QUERY_KEY, queryFn: brokerApi.documents })
   const data = query.data
+  // 운영자가 승인하면 오더 등록이 열리므로, 서류 인증 여부가 me와 다르면 me를 새로 읽는다
+  const verified = data?.verified
+  useEffect(() => {
+    if (verified !== undefined && me && verified !== me.verified) void refreshMe()
+  }, [verified, me, refreshMe])
   return (
     <Card
       title="회사 서류"
@@ -63,8 +68,8 @@ function CompanyDocumentsCard() {
       }
     >
       <p className="mb-4 text-[13.5px] text-ink-sub">
-        이에오 운영자가 사업자등록증과 운송주선사업 허가증을 확인해요. 사진(JPG·PNG, 5MB 이하)으로 올려 주세요. 사업자등록증은 등록된 사업자번호{' '}
-        {formatBusinessNumber(me!.businessNumber)}로 국세청 진위확인을 함께 해요. 사진의 번호·허가 번호·상호·대표자가 회사 정보와 같아야 해요.
+        둘 다 승인되어야 오더를 올릴 수 있어요. 이에오 운영자가 사업자등록증과 운송주선사업 허가증을 확인해요. 사진(JPG·PNG, 5MB 이하)으로 올려 주세요. 사업자등록증은
+        등록된 사업자번호 {formatBusinessNumber(me!.businessNumber)}로 국세청 진위확인을 함께 해요. 사진의 번호·허가 번호·상호·대표자가 회사 정보와 같아야 해요.
       </p>
       {query.isPending ? <Loading rows={2} /> : null}
       {query.isError ? <ErrorText>{query.error.message}</ErrorText> : null}

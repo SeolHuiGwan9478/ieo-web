@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router'
 import { ordersApi } from '../../api/orders'
 import type { OrderStatus } from '../../api/types'
 import { ORDER_STATUS } from '../../api/types'
+import { useAuth } from '../../auth/AuthContext'
+import { CompanyVerificationNotice } from '../../components/CompanyVerificationNotice'
 import { Card, Icon, LinkButton, Loading, PageHeader, Pagination, Table, Tabs, Tag } from '../../components/ui'
 import { formatDateTime, formatWon } from '../../lib/format'
 
@@ -12,6 +14,7 @@ const SIZE = 20
 
 /** 오더 목록 (DSP-001~). 상태별 탭, 대기 중인 요청 수 */
 export function OrdersPage() {
+  const { me } = useAuth()
   const [status, setStatus] = useState<Filter>('OPEN')
   const [page, setPage] = useState(0)
   const navigate = useNavigate()
@@ -27,11 +30,14 @@ export function OrdersPage() {
         title="오더"
         description="올린 오더와 차주들의 배차 요청을 봐요."
         action={
-          <LinkButton to="/orders/new">
-            <Icon name="plus" className="h-4 w-4" /> 오더 등록
-          </LinkButton>
+          me?.verified ? (
+            <LinkButton to="/orders/new">
+              <Icon name="plus" className="h-4 w-4" /> 오더 등록
+            </LinkButton>
+          ) : null
         }
       />
+      <CompanyVerificationNotice />
       <Tabs<Filter>
         value={status}
         onChange={(v) => {

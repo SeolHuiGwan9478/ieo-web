@@ -11,6 +11,7 @@ import { AddressSearch } from '../../components/AddressSearch'
 import type { PostcodeResult } from '../../lib/postcode'
 import { BODY_TYPES, CARGO_CATEGORIES, CONFIRM_MODE, CONSIGNMENT, LOADING_METHODS, PAYMENT_TYPES, TONNAGES } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
+import { CompanyVerificationNotice } from '../../components/CompanyVerificationNotice'
 import { Button, Card, ChipGroup, ErrorText, Field, LinkButton, Loading, PageHeader, SelectField } from '../../components/ui'
 import { formatDateTime, formatWon, localInputValue } from '../../lib/format'
 
@@ -575,6 +576,21 @@ export function OrderNewPage({ mode = 'create' }: { mode?: 'create' | 'edit' }) 
       <>
         {header}
         <ErrorText>{source.error instanceof ApiError ? source.error.message : '오더를 불러오지 못했어요.'}</ErrorText>
+      </>
+    )
+  }
+  // 회사 서류가 승인되기 전에는 서버가 403(BROKER_403_UNVERIFIED)을 돌려주므로 폼을 보여 주지 않는다 (07 인계서 13장)
+  if (!editing && me && !me.verified) {
+    return (
+      <>
+        {header}
+        <CompanyVerificationNotice />
+        <Card>
+          <p className="text-[14px] text-ink-mid">사업자등록증과 운송주선사업 허가증이 승인되면 바로 오더를 올릴 수 있어요. 설정의 회사 서류에서 심사 상태를 볼 수 있어요.</p>
+          <div className="mt-4">
+            <LinkButton to="/settings">설정으로</LinkButton>
+          </div>
+        </Card>
       </>
     )
   }
