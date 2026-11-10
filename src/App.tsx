@@ -15,9 +15,10 @@ import { MembersPage } from './pages/MembersPage'
 import { ReportsPage } from './pages/ReportsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { RequireAdmin } from './admin/RequireAdmin'
+import { REVIEW_KINDS } from './admin/reviewKinds'
 import { AdminLoginPage } from './pages/admin/AdminLoginPage'
 import { AdminReviewsPage } from './pages/admin/AdminReviewsPage'
-import { AdminDriverReviewPage } from './pages/admin/AdminDriverReviewPage'
+import { AdminReviewDetailPage } from './pages/admin/AdminReviewDetailPage'
 
 /** 로그인 안 했으면 로그인으로, 소속 회사가 없으면 회사 등록으로 */
 function RequireCompany() {
@@ -73,12 +74,14 @@ export default function App() {
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
-      {/* 이에오 운영자 페이지. 주선사 콘솔과 로그인·토큰이 따로다 (07 운영자 서류심사 인계) */}
+      {/* 이에오 운영자 페이지. 주선사 콘솔과 로그인·토큰이 따로다 (07 운영자 서류심사 인계). 차주 심사와 주선사 심사는 같은 페이지에 설정만 다르다 */}
       <Route path="/admin/login" element={<AdminLoginPage />} />
       <Route path="/admin" element={<RequireAdmin />}>
         <Route index element={<Navigate to="/admin/reviews" replace />} />
-        <Route path="reviews" element={<AdminReviewsPage />} />
-        <Route path="drivers/:driverId" element={<AdminDriverReviewPage />} />
+        <Route path="reviews" element={<AdminReviewsPage config={REVIEW_KINDS.driver} />} />
+        <Route path="drivers/:id" element={<AdminReviewDetailPage config={REVIEW_KINDS.driver} />} />
+        <Route path="brokers" element={<AdminReviewsPage config={REVIEW_KINDS.broker} />} />
+        <Route path="brokers/:id" element={<AdminReviewDetailPage config={REVIEW_KINDS.broker} />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

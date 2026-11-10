@@ -1,23 +1,27 @@
 import { useState, type FormEvent } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
-import { adminApi, type ReviewFilter, type ReviewRow } from '../../api/admin'
+import type { ReviewDetailBase, ReviewFilter, ReviewRowBase } from '../../api/admin'
 import { REVIEW_TABS, businessCheckTag } from '../../admin/documentStatus'
+import type { ReviewKindConfig } from '../../admin/reviewKinds'
 import { Button, Card, Loading, PageHeader, Pagination, Table, Tabs, Tag } from '../../components/ui'
 import { formatDateTime, formatRelative } from '../../lib/format'
 
 const SIZE = 20
 
-/** 심사 목록 (07 인계서 6.2). 차주 한 명이 한 줄. 심사 대기는 오래 기다린 차주부터 보여 준다 */
-export function AdminReviewsPage() {
+/**
+ * 심사 목록 (07 인계서 6.2, 13장). 차주 한 명(또는 회사 하나)이 한 줄. 심사 대기는 오래 기다린 쪽부터 보여 준다.
+ * 차주·주선사의 차이(제목, API, 앞 칸)는 config(reviewKinds.tsx)에 있다
+ */
+export function AdminReviewsPage<R extends ReviewRowBase, D extends ReviewDetailBase>({ config }: { config: ReviewKindConfig<R, D> }) {
   const [status, setStatus] = useState<ReviewFilter>('PENDING')
   const [draft, setDraft] = useState('')
   const [q, setQ] = useState('')
   const [page, setPage] = useState(0)
   const navigate = useNavigate()
   const query = useQuery({
-    queryKey: ['admin', 'reviews', { status, q, page, size: SIZE }],
-    queryFn: () => adminApi.reviews({ status, q, page, size: SIZE }),
+    queryKey: ['admin', config.kind, 'reviews', { status, q, page, size: SIZE }],
+    queryFn: () => config.api.list({ status, q, page, size: SIZE }),
     placeholderData: keepPreviousData,
   })
 
@@ -29,24 +33,21 @@ export function AdminReviewsPage() {
 
   return (
     <>
-      <PageHeader
-        title="차주 서류 심사"
-        description="차주가 낸 서류를 보고 승인하거나, 사유를 골라 반려해요. 필수 서류 4종이 모두 승인되면 인증된 차주가 돼요."
-      />
+      <PageHeader title={config.title} description={config.listDescription} />
       <Tabs<ReviewFilter>
         value={status}
         onChange={(v) => {
           setStatus(v)
           setPage(0)
         }}
-        items={REVIEW_TABS.map((tab) => (tab.value === 'PENDING' ? { ...tab, count: query.data?.pendingDrivers } : tab))}
+        items={REVIEW_TABS.map((tab) => (tab.value === 'PENDING' ? { ...tab, count: query.data ? config.api.pendingOf(query.data) : undefined } : tab))}
       />
       <form onSubmit={search} className="mb-4 flex gap-2">
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="이름, 휴대폰 뒷자리, 차량 번호"
-          aria-label="차주 검색"
+          placeholder={config.searchPlaceholder}
+          aria-label={`${config.subject} 검색`}
           className="h-11 flex-1 rounded-xl border border-line bg-white px-4 text-[14px] text-ink-strong outline-none placeholder:text-ink-sub focus:border-orange-500"
         />
         <Button type="submit" variant="secondary">
@@ -71,23 +72,13 @@ export function AdminReviewsPage() {
           <Loading rows={5} />
         ) : (
           <>
-            <Table<ReviewRow>
+            <Table<R>
               rows={query.data?.items ?? []}
-              rowKey={(r) => r.driverId}
-              onRowClick={(r) => navigate(`/admin/drivers/${r.driverId}`)}
-              empty={emptyMessage(status, q)}
+              rowKey={(r) => config.rowId(r)}
+              onRowClick={(r) => navigate(config.detailPath(config.rowId(r)))}
+              empty={q ? config.emptyMessages.search : config.emptyMessages[status]}
               columns={[
-                {
-                  key: 'driver',
-                  header: '차주',
-                  cell: (r) => (
-                    <div>
-                      <p className="font-semibold">{r.name ?? '(이름 없음)'}</p>
-                      <p className="text-[12.5px] text-ink-sub">{r.phone ?? '-'}</p>
-                    </div>
-                  ),
-                },
-                { key: 'plate', header: '차량 번호', cell: (r) => r.plateNumber ?? <span className="text-ink-sub">미등록</span> },
+                ...config.columns,
                 {
                   key: 'progress',
                   header: '서류 진행',
@@ -132,14 +123,4 @@ export function AdminReviewsPage() {
       </Card>
     </>
   )
-}
-
-function emptyMessage(status: ReviewFilter, q: string) {
-  if (q) return '찾는 차주가 없어요.'
-  return {
-    PENDING: '심사를 기다리는 서류가 없어요.',
-    APPROVED: '아직 인증된 차주가 없어요.',
-    REJECTED: '반려된 서류를 아직 다시 내지 않은 차주가 없어요.',
-    ALL: '서류를 낸 차주가 아직 없어요.',
-  }[status]
 }

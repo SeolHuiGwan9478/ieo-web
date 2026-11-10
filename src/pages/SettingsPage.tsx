@@ -1,29 +1,172 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { brokerApi, type BrokerPlan } from '../api/broker'
+import type { DocumentTypeItem } from '../api/admin'
 import { settingsApi, type WaitPolicyInput } from '../api/settings'
 import { ApiError } from '../api/client'
+import { DOCUMENT_STATUS } from '../admin/documentStatus'
 import { useAuth } from '../auth/AuthContext'
-import { Button, Card, ErrorText, Field, PageHeader, SelectField, Tag } from '../components/ui'
-import { formatBusinessNumber, formatDateTime, formatWon } from '../lib/format'
+import { Button, Card, ErrorText, Field, Loading, PageHeader, SelectField, Tag } from '../components/ui'
+import { formatBusinessNumber, formatDateTime, formatWon, todayIso } from '../lib/format'
 
-/** 설정: 회사 정보·정산 주기(대표), 대기비 정책(대표), 플랜(대표) */
+/** 설정: 회사 정보·정산 주기(대표), 대기비 정책(대표), 회사 서류(담당자 누구나), 플랜(대표) */
 export function SettingsPage() {
   const { me } = useAuth()
   if (!me) return null
   const isOwner = me.position === 'OWNER'
   return (
     <>
-      <PageHeader title="설정" description={isOwner ? '회사 정보, 정산 주기, 대기비 정책, 플랜을 바꿔요.' : '회사 설정은 대표만 바꿀 수 있어요. 보기만 할 수 있어요.'} />
+      <PageHeader
+        title="설정"
+        description={isOwner ? '회사 정보, 정산 주기, 대기비 정책, 회사 서류, 플랜을 바꿔요.' : '회사 설정은 대표만 바꿀 수 있어요. 회사 서류는 올릴 수 있고, 나머지는 보기만 할 수 있어요.'}
+      />
       <div className="grid gap-5 lg:grid-cols-2">
         <CompanyCard isOwner={isOwner} />
         <WaitPolicyCard isOwner={isOwner} />
+        <div className="lg:col-span-2">
+          <CompanyDocumentsCard />
+        </div>
         <div className="lg:col-span-2">
           <PlanCard isOwner={isOwner} />
         </div>
       </div>
     </>
+  )
+}
+
+const DOCUMENTS_QUERY_KEY = ['brokers', 'documents'] as const
+
+/**
+ * 회사 서류 (07 인계서 13장). 사업자등록증과 운송주선사업 허가증을 사진으로 올리면 이에오 운영자가 심사한다.
+ * 담당자 누구나 올릴 수 있다. 심사 중인 서류는 결과가 나올 때까지 다시 못 올리고, 반려·승인 뒤에는 새로 올린다
+ */
+function CompanyDocumentsCard() {
+  const { me } = useAuth()
+  const query = useQuery({ queryKey: DOCUMENTS_QUERY_KEY, queryFn: brokerApi.documents })
+  const data = query.data
+  return (
+    <Card
+      title="회사 서류"
+      action={
+        data ? (
+          data.verified ? (
+            <Tag tone="green" dot>
+              인증된 주선사
+            </Tag>
+          ) : (
+            <Tag tone="gray">
+              필수 {data.approvedRequired}/{data.requiredTotal} 승인
+            </Tag>
+          )
+        ) : null
+      }
+    >
+      <p className="mb-4 text-[13.5px] text-ink-sub">
+        이에오 운영자가 사업자등록증과 운송주선사업 허가증을 확인해요. 사진(JPG·PNG, 5MB 이하)으로 올려 주세요. 사업자등록증은 등록된 사업자번호{' '}
+        {formatBusinessNumber(me!.businessNumber)}로 국세청 진위확인을 함께 해요. 사진의 번호·허가 번호·상호·대표자가 회사 정보와 같아야 해요.
+      </p>
+      {query.isPending ? <Loading rows={2} /> : null}
+      {query.isError ? <ErrorText>{query.error.message}</ErrorText> : null}
+      {data ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          {data.documents.map((item) => (
+            <CompanyDocumentRow key={item.type} item={item} representativeName={me!.representativeName} />
+          ))}
+        </div>
+      ) : null}
+    </Card>
+  )
+}
+
+function CompanyDocumentRow({ item, representativeName }: { item: DocumentTypeItem; representativeName: string | null }) {
+  const queryClient = useQueryClient()
+  const [file, setFile] = useState<File | null>(null)
+  const [openedOn, setOpenedOn] = useState('')
+  const [ownerName, setOwnerName] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [inputKey, setInputKey] = useState(0)
+  const upload = useMutation({
+    mutationFn: () => {
+      const form = new FormData()
+      form.append('type', item.type)
+      form.append('file', file!)
+      if (item.type === 'BUSINESS_REGISTRATION') {
+        form.append('openedOn', openedOn)
+        if (ownerName.trim()) form.append('ownerName', ownerName.trim())
+      }
+      return brokerApi.uploadDocument(form)
+    },
+    onSuccess: () => {
+      setFile(null)
+      setInputKey((k) => k + 1)
+      setError(null)
+      void queryClient.invalidateQueries({ queryKey: DOCUMENTS_QUERY_KEY })
+    },
+    onError: (e) => setError(e instanceof ApiError ? e.message : '서버와 연결할 수 없어요.'),
+  })
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!file) {
+      setError('사진을 골라 주세요.')
+      return
+    }
+    upload.mutate()
+  }
+  const latest = item.latest
+  const canUpload = !latest || latest.status !== 'PENDING'
+  const isBusiness = item.type === 'BUSINESS_REGISTRATION'
+  return (
+    <div className="rounded-xl border border-line p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="font-semibold text-ink-strong">{item.label}</p>
+          <p className="text-[12.5px] text-ink-sub">{latest ? `${formatDateTime(latest.submittedAt)} 제출` : '아직 올리지 않았어요'}</p>
+        </div>
+        {latest ? (
+          <Tag tone={DOCUMENT_STATUS[latest.status].tone} dot>
+            {DOCUMENT_STATUS[latest.status].label}
+          </Tag>
+        ) : (
+          <Tag tone="gray">미제출</Tag>
+        )}
+      </div>
+      {latest?.rejectMessage ? <p className="mt-2 text-[13px] text-status-red">반려 사유: {latest.rejectMessage}</p> : null}
+      {latest?.businessCheck && latest.status === 'PENDING' ? <p className="mt-2 text-[12.5px] text-ink-mid">국세청 확인: {latest.businessCheck.summary}</p> : null}
+      {canUpload ? (
+        <form onSubmit={submit} className="mt-3 space-y-3">
+          {isBusiness ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="개업일" type="date" required max={todayIso()} value={openedOn} onChange={(e) => setOpenedOn(e.target.value)} hint="사업자등록증에 적힌 개업연월일" />
+              <Field
+                label="대표자 이름"
+                required={!representativeName}
+                placeholder={representativeName ?? '사업자등록증의 대표자'}
+                hint={representativeName ? `비우면 등록된 대표자 ${representativeName}로 조회해요` : '회사 정보에 대표자가 없어 꼭 적어요'}
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+              />
+            </div>
+          ) : null}
+          <Field
+            key={inputKey}
+            label={latest ? '다시 올리기' : '사진'}
+            type="file"
+            accept="image/png,image/jpeg"
+            hint="JPG·PNG, 5MB 이하. 글씨가 읽히게 밝은 곳에서 전체가 나오게 찍어 주세요."
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
+          <ErrorText>{error}</ErrorText>
+          <div className="flex justify-end">
+            <Button type="submit" size="sm" loading={upload.isPending} disabled={!file}>
+              올리기
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <p className="mt-3 text-[12.5px] text-ink-sub">운영자가 확인하는 중이에요. 결과가 나오면 다시 올릴 수 있어요.</p>
+      )}
+    </div>
   )
 }
 

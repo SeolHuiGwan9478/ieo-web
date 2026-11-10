@@ -1,17 +1,34 @@
 import { api, apiBlob } from './client'
 
-/** 운영자 서류 심사 (docs/design/07_운영자_서류심사_인계.md 7장). /api/admin/** 은 운영자(ADMIN) 계정만 통과한다 */
+/**
+ * 운영자 서류 심사 (docs/design/07_운영자_서류심사_인계.md 7장·13장). /api/admin/** 은 운영자(ADMIN) 계정만 통과한다.
+ * 차주 서류와 주선사 서류는 같은 모양의 응답을 돌려주고, 화면도 src/admin/reviewKinds.tsx의 설정으로 같은 페이지를 쓴다
+ */
 
-export type DocumentType = 'BUSINESS_REGISTRATION' | 'VEHICLE_REGISTRATION' | 'DRIVER_LICENSE' | 'FREIGHT_QUALIFICATION' | 'CONSIGNMENT_CONTRACT' | 'CARGO_INSURANCE'
+export type DriverDocumentType = 'BUSINESS_REGISTRATION' | 'VEHICLE_REGISTRATION' | 'DRIVER_LICENSE' | 'FREIGHT_QUALIFICATION' | 'CONSIGNMENT_CONTRACT' | 'CARGO_INSURANCE'
+export type BrokerDocumentType = 'BUSINESS_REGISTRATION' | 'BROKER_LICENSE'
+export type DocumentType = DriverDocumentType | BrokerDocumentType
 export type DocumentStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
-export type RejectReason = 'UNREADABLE' | 'CROPPED' | 'WRONG_DOCUMENT' | 'NAME_MISMATCH' | 'BUSINESS_MISMATCH' | 'BUSINESS_CLOSED' | 'VEHICLE_MISMATCH' | 'EXPIRED' | 'CONTRACT_REQUIRED' | 'OTHER'
+export type RejectReason =
+  | 'UNREADABLE'
+  | 'CROPPED'
+  | 'WRONG_DOCUMENT'
+  | 'NAME_MISMATCH'
+  | 'COMPANY_MISMATCH'
+  | 'BUSINESS_MISMATCH'
+  | 'BUSINESS_CLOSED'
+  | 'VEHICLE_MISMATCH'
+  | 'LICENSE_MISMATCH'
+  | 'EXPIRED'
+  | 'CONTRACT_REQUIRED'
+  | 'OTHER'
 export type ReviewFilter = 'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL'
 export type DocumentEventType = 'SUBMITTED' | 'BUSINESS_CHECKED' | 'VIEWED' | 'APPROVED' | 'REJECTED'
 export type BusinessCheckResult = 'MATCH' | 'MISMATCH' | 'ERROR' | 'SKIPPED'
 export type BusinessStatus = 'ACTIVE' | 'SUSPENDED' | 'CLOSED'
 
 /**
- * 사업자등록증에 붙는 입력값과 국세청 진위확인 결과 (07 인계서 12장). 조회는 차주가 입력한 값 기준이라 사진과 같은지는 운영자가 본다.
+ * 사업자등록증에 붙는 입력값과 국세청 진위확인 결과 (07 인계서 12장). 조회는 입력한(또는 등록된) 값 기준이라 사진과 같은지는 운영자가 본다.
  * 결과는 참고용이고 승인·반려는 운영자가 정한다. attention이면 불일치·휴업·폐업·조회 실패라 눈여겨본다
  */
 export interface BusinessCheck {
@@ -31,7 +48,7 @@ export interface BusinessCheck {
   stub: boolean
 }
 
-/** 서류 한 건. rejectMessage는 차주에게 그대로 보이는 문구 */
+/** 서류 한 건. rejectMessage는 낸 사람에게 그대로 보이는 문구 */
 export interface DocumentItem {
   id: number
   type: DocumentType
@@ -58,12 +75,9 @@ export interface DocumentTypeItem {
   history: DocumentItem[]
 }
 
-/** 심사 목록 한 줄 = 차주 한 명 */
-export interface ReviewRow {
-  driverId: number
+/** 심사 목록 한 줄의 공통 부분 (차주 한 명 또는 회사 하나) */
+export interface ReviewRowBase {
   name: string | null
-  phone: string | null
-  plateNumber: string | null
   approvedRequired: number
   requiredTotal: number
   pendingCount: number
@@ -78,13 +92,33 @@ export interface ReviewRow {
   businessAttention: boolean
 }
 
-export interface ReviewList {
-  items: ReviewRow[]
+export interface DriverReviewRow extends ReviewRowBase {
+  driverId: number
+  phone: string | null
+  plateNumber: string | null
+}
+
+export interface BrokerReviewRow extends ReviewRowBase {
+  brokerId: number
+  businessNumber: string
+  licenseNumber: string
+  representativeName: string | null
+}
+
+export interface ReviewListBase<R> {
+  items: R[]
   page: number
   size: number
   totalCount: number
-  /** 탭과 상관없이 심사 대기 서류가 있는 차주 수 (메뉴 배지) */
+}
+
+/** pendingDrivers는 탭과 상관없이 심사 대기 서류가 있는 차주 수 (메뉴 배지) */
+export interface DriverReviewList extends ReviewListBase<DriverReviewRow> {
   pendingDrivers: number
+}
+
+export interface BrokerReviewList extends ReviewListBase<BrokerReviewRow> {
+  pendingBrokers: number
 }
 
 export interface ReviewEvent {
@@ -107,15 +141,33 @@ export interface RejectReasonOption {
   noteRequired: boolean
 }
 
-export interface DriverReview {
-  driver: { id: number; name: string | null; phone: string | null; licenseNumber: string | null; status: string }
-  vehicle: { id: number; plateNumber: string; tonnageLabel: string; bodyTypeLabel: string; heightM: number | null } | null
+/** 심사 상세의 공통 부분. 서류·이력·반려 사유는 차주와 주선사가 같은 모양이다 */
+export interface ReviewDetailBase {
   verified: boolean
   approvedRequired: number
   requiredTotal: number
   documents: DocumentTypeItem[]
   events: ReviewEvent[]
   rejectReasons: RejectReasonOption[]
+}
+
+export interface DriverReview extends ReviewDetailBase {
+  driver: { id: number; name: string | null; phone: string | null; licenseNumber: string | null; status: string }
+  vehicle: { id: number; plateNumber: string; tonnageLabel: string; bodyTypeLabel: string; heightM: number | null } | null
+}
+
+export interface BrokerReview extends ReviewDetailBase {
+  broker: {
+    id: number
+    name: string
+    businessNumber: string
+    licenseNumber: string
+    representativeName: string | null
+    registeredAt: string
+    memberCount: number
+    ownerName: string | null
+    ownerPhone: string | null
+  }
 }
 
 export interface AdminMe {
@@ -126,10 +178,19 @@ export interface AdminMe {
   status: string
 }
 
+/** 목록 조건. interface가 아니라 type인 이유: api()의 query(Record)에 그대로 넘기려면 색인 서명이 있어야 한다 */
+export type ReviewListParams = {
+  status: ReviewFilter
+  q?: string
+  page: number
+  size: number
+}
+
 export const adminApi = {
   me: () => api<AdminMe>('/api/users/me'),
-  reviews: (params: { status: ReviewFilter; q?: string; page: number; size: number }) =>
-    api<ReviewList>('/api/admin/driver-documents', { query: params }),
+
+  /** 차주 서류 심사 */
+  reviews: (params: ReviewListParams) => api<DriverReviewList>('/api/admin/driver-documents', { query: params }),
   driver: (driverId: string | number) => api<DriverReview>(`/api/admin/drivers/${driverId}/documents`),
   /** 서류 사진. 열 때마다 서버가 열람 이력을 남긴다 */
   file: (documentId: number) => apiBlob(`/api/admin/driver-documents/${documentId}/file`),
@@ -138,4 +199,13 @@ export const adminApi = {
   recheckBusiness: (documentId: number) => api<DocumentItem>(`/api/admin/driver-documents/${documentId}/business-check`, { method: 'POST' }),
   reject: (documentId: number, body: { reasonCode: RejectReason; note?: string }) =>
     api<DocumentItem>(`/api/admin/driver-documents/${documentId}/reject`, { method: 'POST', body }),
+
+  /** 주선사 서류 심사 (07 인계서 13장). 회사 하나가 한 줄 */
+  brokerReviews: (params: ReviewListParams) => api<BrokerReviewList>('/api/admin/broker-documents', { query: params }),
+  broker: (brokerId: string | number) => api<BrokerReview>(`/api/admin/brokers/${brokerId}/documents`),
+  brokerFile: (documentId: number) => apiBlob(`/api/admin/broker-documents/${documentId}/file`),
+  brokerApprove: (documentId: number) => api<DocumentItem>(`/api/admin/broker-documents/${documentId}/approve`, { method: 'POST' }),
+  brokerRecheckBusiness: (documentId: number) => api<DocumentItem>(`/api/admin/broker-documents/${documentId}/business-check`, { method: 'POST' }),
+  brokerReject: (documentId: number, body: { reasonCode: RejectReason; note?: string }) =>
+    api<DocumentItem>(`/api/admin/broker-documents/${documentId}/reject`, { method: 'POST', body }),
 }

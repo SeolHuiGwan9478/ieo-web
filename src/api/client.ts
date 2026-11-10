@@ -93,6 +93,19 @@ export async function apiBlob(path: string): Promise<Blob> {
   return response.blob()
 }
 
+/** 파일을 multipart로 올리는 API. Content-Type은 브라우저가 boundary와 함께 붙인다 */
+export async function apiForm<T>(path: string, form: FormData): Promise<T> {
+  let response = await sendForm(path, form)
+  if (response.status === 401 && (await refreshTokens())) response = await sendForm(path, form)
+  return parse<T>(response)
+}
+
+function sendForm(path: string, form: FormData) {
+  const headers: Record<string, string> = {}
+  if (tokens.access) headers['Authorization'] = `Bearer ${tokens.access}`
+  return fetch(new URL(path, API_BASE), { method: 'POST', headers, body: form })
+}
+
 async function send(path: string, { method = 'GET', body, auth = true, query }: RequestOptions) {
   const url = new URL(path, API_BASE)
   if (query) {

@@ -1,25 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router'
-import { adminApi, type BusinessCheck, type DocumentItem, type DocumentStatus, type DocumentType, type RejectReason } from '../../api/admin'
+import type { BusinessCheck, DocumentItem, DocumentStatus, DocumentType, RejectReason, ReviewDetailBase, ReviewRowBase } from '../../api/admin'
 import { ApiError } from '../../api/client'
 import { DOCUMENT_STATUS, businessCheckTag } from '../../admin/documentStatus'
+import type { ReviewKindConfig } from '../../admin/reviewKinds'
 import { Button, Card, DescList, ErrorText, Loading, Modal, PageHeader, Tag, TextareaField } from '../../components/ui'
 import { formatDateTime } from '../../lib/format'
 
 /**
- * 차주별 심사 상세 (07 인계서 6.3). 왼쪽은 서류 사진(확대·회전·서류 간 이동), 오른쪽은 앱에 입력된 값과 확인 항목, 처리 이력.
+ * 차주별·회사별 심사 상세 (07 인계서 6.3, 13장). 왼쪽은 서류 사진(확대·회전·서류 간 이동), 오른쪽은 등록된 정보와 확인 항목, 처리 이력.
  * 서류마다 승인하거나 사유를 골라 반려한다. 다른 운영자가 먼저 처리했으면 409를 받고 새로 고친다.
- * 사업자등록증은 국세청 진위확인 결과 카드가 붙고 "다시 조회"할 수 있다 (12장)
+ * 사업자등록증은 국세청 진위확인 결과 카드가 붙고 "다시 조회"할 수 있다 (12장). 차주·주선사의 차이는 config(reviewKinds.tsx)에 있다
  */
-export function AdminDriverReviewPage() {
-  const { driverId } = useParams()
+export function AdminReviewDetailPage<R extends ReviewRowBase, D extends ReviewDetailBase>({ config }: { config: ReviewKindConfig<R, D> }) {
+  const { id } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const query = useQuery({
-    queryKey: ['admin', 'driver', driverId],
-    queryFn: () => adminApi.driver(driverId!),
-    enabled: Boolean(driverId),
+    queryKey: ['admin', config.kind, 'detail', id],
+    queryFn: () => config.api.detail(id!),
+    enabled: Boolean(id),
   })
   const [selected, setSelected] = useState<DocumentType | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -46,7 +47,7 @@ export function AdminDriverReviewPage() {
     setNotice(e instanceof Error ? e.message : '처리하지 못했어요.')
   }
   const approve = useMutation({
-    mutationFn: (id: number) => adminApi.approve(id),
+    mutationFn: (documentId: number) => config.api.approve(documentId),
     onSuccess: () => {
       setNotice(null)
       void refresh()
@@ -54,7 +55,7 @@ export function AdminDriverReviewPage() {
     onError: failed,
   })
   const reject = useMutation({
-    mutationFn: (input: { id: number; reasonCode: RejectReason; note?: string }) => adminApi.reject(input.id, { reasonCode: input.reasonCode, note: input.note }),
+    mutationFn: (input: { id: number; reasonCode: RejectReason; note?: string }) => config.api.reject(input.id, { reasonCode: input.reasonCode, note: input.note }),
     onSuccess: () => {
       setNotice(null)
       setRejecting(false)
@@ -66,7 +67,7 @@ export function AdminDriverReviewPage() {
     },
   })
   const recheck = useMutation({
-    mutationFn: (id: number) => adminApi.recheckBusiness(id),
+    mutationFn: (documentId: number) => config.api.recheckBusiness(documentId),
     onSuccess: () => {
       setNotice(null)
       void refresh()
@@ -91,23 +92,23 @@ export function AdminDriverReviewPage() {
       return
     }
     if (option.noteRequired && !note.trim()) {
-      setReasonError('기타는 차주에게 보일 사유를 직접 적어 주세요.')
+      setReasonError(config.otherReasonError)
       return
     }
     reject.mutate({ id: current.latest.id, reasonCode: option.code, note: note.trim() || undefined })
   }
 
-  /** 처리가 끝나면 다음 심사 대기 차주로 넘어간다 */
+  /** 처리가 끝나면 다음 심사 대기 건으로 넘어간다 */
   const goNext = async () => {
     setNextBusy(true)
     try {
-      const list = await adminApi.reviews({ status: 'PENDING', page: 0, size: 5 })
-      const next = list.items.find((r) => String(r.driverId) !== driverId)
+      const list = await config.api.list({ status: 'PENDING', page: 0, size: 5 })
+      const next = list.items.find((r) => String(config.rowId(r)) !== id)
       if (next) {
         setSelected(null)
-        navigate(`/admin/drivers/${next.driverId}`)
+        navigate(config.detailPath(config.rowId(next)))
       } else {
-        setNotice('심사를 기다리는 다른 차주가 없어요.')
+        setNotice(config.noNextMessage)
       }
     } catch (e) {
       failed(e)
@@ -121,20 +122,21 @@ export function AdminDriverReviewPage() {
     return (
       <Card>
         <ErrorText>{query.error.message}</ErrorText>
-        <Link to="/admin/reviews" className="mt-3 inline-block text-[14px] font-semibold text-orange-700 underline underline-offset-2">
+        <Link to={config.listPath} className="mt-3 inline-block text-[14px] font-semibold text-orange-700 underline underline-offset-2">
           심사 목록으로
         </Link>
       </Card>
     )
   }
   const data = query.data
+  const info = config.infoCard(data)
 
   return (
     <>
       <PageHeader
-        back={{ to: '/admin/reviews', label: '심사 목록' }}
-        title={data.driver.name ?? '(이름 없음)'}
-        description="서류 사진과 앱에 입력된 정보를 나란히 놓고 대조해요. 서류마다 승인하거나 사유를 골라 반려해요."
+        back={{ to: config.listPath, label: '심사 목록' }}
+        title={config.detailTitle(data)}
+        description={config.detailDescription}
         action={
           <div className="flex items-center gap-2">
             {data.verified ? (
@@ -157,9 +159,9 @@ export function AdminDriverReviewPage() {
       ) : null}
       {pendingLeft === 0 && submitted.length > 0 ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-white px-4 py-3 text-[14px]">
-          <span className="text-ink-mid">이 차주의 서류는 모두 처리했어요.</span>
+          <span className="text-ink-mid">{config.allDoneMessage}</span>
           <div className="flex gap-2">
-            <Button size="sm" variant="secondary" onClick={() => navigate('/admin/reviews')}>
+            <Button size="sm" variant="secondary" onClick={() => navigate(config.listPath)}>
               목록으로
             </Button>
             <Button size="sm" loading={nextBusy} onClick={goNext}>
@@ -200,6 +202,7 @@ export function AdminDriverReviewPage() {
               <DocumentViewer
                 key={current.latest.id}
                 document={current.latest}
+                fetchFile={config.api.file}
                 onPrev={currentIndex > 0 ? () => setSelected(submitted[currentIndex - 1].type) : undefined}
                 onNext={currentIndex < submitted.length - 1 ? () => setSelected(submitted[currentIndex + 1].type) : undefined}
               />
@@ -235,17 +238,8 @@ export function AdminDriverReviewPage() {
         </Card>
 
         <div className="space-y-5">
-          <Card title="앱에 입력된 정보">
-            <DescList
-              items={[
-                { label: '이름', value: data.driver.name ?? '-' },
-                { label: '휴대폰', value: data.driver.phone ?? '-' },
-                { label: '차량 번호', value: data.vehicle?.plateNumber ?? '미등록' },
-                { label: '톤수·차종', value: data.vehicle ? `${data.vehicle.tonnageLabel} ${data.vehicle.bodyTypeLabel}` : '-' },
-                { label: '차량 높이', value: data.vehicle?.heightM != null ? `${data.vehicle.heightM}m` : '-' },
-                { label: '자격증 번호', value: data.driver.licenseNumber ?? '-' },
-              ]}
-            />
+          <Card title={info.title}>
+            <DescList items={info.items} />
           </Card>
           {current?.latest?.businessCheck ? (
             <BusinessCheckCard
@@ -291,7 +285,7 @@ export function AdminDriverReviewPage() {
       </div>
 
       <Modal open={rejecting} onClose={() => setRejecting(false)} title="반려 사유">
-        <p className="mb-3 text-[13.5px] text-ink-sub">고른 사유의 문구가 차주에게 그대로 보여요. 차주는 반려된 서류만 다시 올릴 수 있어요.</p>
+        <p className="mb-3 text-[13.5px] text-ink-sub">{config.rejectHint}</p>
         <div className="max-h-[320px] space-y-1.5 overflow-y-auto pr-1">
           {data.rejectReasons.map((option) => (
             <label
@@ -310,7 +304,7 @@ export function AdminDriverReviewPage() {
               />
               <span>
                 <span className="block text-[14px] font-semibold text-ink-strong">{option.label}</span>
-                <span className="block text-[12.5px] text-ink-sub">{option.message ?? '차주에게 보일 사유를 직접 적어요'}</span>
+                <span className="block text-[12.5px] text-ink-sub">{option.message ?? '보일 사유를 직접 적어요'}</span>
               </span>
             </label>
           ))}
@@ -321,7 +315,7 @@ export function AdminDriverReviewPage() {
             value={note}
             maxLength={200}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="차주에게 보이는 글이에요"
+            placeholder={config.rejectNotePlaceholder}
             error={reasonError ?? undefined}
           />
         </div>
@@ -338,7 +332,7 @@ export function AdminDriverReviewPage() {
   )
 }
 
-/** 사업자등록증의 입력값과 국세청 진위확인 (07 인계서 12장). 조회는 입력값 기준이라 사진의 번호·개업일·대표자와 같은지 먼저 본다 */
+/** 사업자등록증의 입력값과 국세청 진위확인 (07 인계서 12장). 조회는 입력된(등록된) 값 기준이라 사진의 번호·개업일·대표자와 같은지 먼저 본다 */
 function BusinessCheckCard({ check, pending, busy, rechecking, onRecheck }: { check: BusinessCheck; pending: boolean; busy: boolean; rechecking: boolean; onRecheck: () => void }) {
   const tag = businessCheckTag(check.result, check.status)
   const look = check.attention ? 'bg-status-red-bg text-status-red' : check.result === 'MATCH' ? 'bg-status-green-bg text-status-green' : 'bg-canvas text-ink-mid'
@@ -377,13 +371,23 @@ function BusinessCheckCard({ check, pending, busy, rechecking, onRecheck }: { ch
           { label: '조회 시각', value: check.checkedAt ? formatDateTime(check.checkedAt) : '-' },
         ]}
       />
-      <p className="mt-3 text-[12.5px] text-ink-sub">차주가 입력한 값으로 조회해요. 사진의 번호·개업일·대표자와 같은지 먼저 보고, 승인·반려는 운영자가 정해요.</p>
+      <p className="mt-3 text-[12.5px] text-ink-sub">입력되거나 등록된 값으로 조회해요. 사진의 번호·개업일·대표자와 같은지 먼저 보고, 승인·반려는 운영자가 정해요.</p>
     </Card>
   )
 }
 
 /** 서류 사진. 로그인 토큰이 필요한 API라 <img src>로 바로 못 열고, 받아서 blob 주소로 보여 준다 */
-function DocumentViewer({ document, onPrev, onNext }: { document: DocumentItem; onPrev?: () => void; onNext?: () => void }) {
+function DocumentViewer({
+  document,
+  fetchFile,
+  onPrev,
+  onNext,
+}: {
+  document: DocumentItem
+  fetchFile: (documentId: number) => Promise<Blob>
+  onPrev?: () => void
+  onNext?: () => void
+}) {
   const [url, setUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
@@ -392,8 +396,7 @@ function DocumentViewer({ document, onPrev, onNext }: { document: DocumentItem; 
   useEffect(() => {
     let active = true
     let objectUrl: string | null = null
-    adminApi
-      .file(document.id)
+    fetchFile(document.id)
       .then((blob) => {
         if (!active) return
         objectUrl = URL.createObjectURL(blob)
@@ -406,7 +409,7 @@ function DocumentViewer({ document, onPrev, onNext }: { document: DocumentItem; 
       active = false
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [document.id])
+  }, [document.id, fetchFile])
 
   return (
     <div>
