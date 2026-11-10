@@ -14,6 +14,10 @@ import { DriversPage } from './pages/DriversPage'
 import { MembersPage } from './pages/MembersPage'
 import { ReportsPage } from './pages/ReportsPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { RequireAdmin } from './admin/RequireAdmin'
+import { AdminLoginPage } from './pages/admin/AdminLoginPage'
+import { AdminReviewsPage } from './pages/admin/AdminReviewsPage'
+import { AdminDriverReviewPage } from './pages/admin/AdminDriverReviewPage'
 
 /** 로그인 안 했으면 로그인으로, 소속 회사가 없으면 회사 등록으로 */
 function RequireCompany() {
@@ -68,6 +72,13 @@ export default function App() {
         <Route path="/members" element={<MembersPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+      </Route>
+      {/* 이에오 운영자 페이지. 주선사 콘솔과 로그인·토큰이 따로다 (07 운영자 서류심사 인계) */}
+      <Route path="/admin/login" element={<AdminLoginPage />} />
+      <Route path="/admin" element={<RequireAdmin />}>
+        <Route index element={<Navigate to="/admin/reviews" replace />} />
+        <Route path="reviews" element={<AdminReviewsPage />} />
+        <Route path="drivers/:driverId" element={<AdminDriverReviewPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

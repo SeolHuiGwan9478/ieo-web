@@ -5,8 +5,14 @@
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? 'http://localhost:8080'
 
-const ACCESS_KEY = 'ieo.accessToken'
-const REFRESH_KEY = 'ieo.refreshToken'
+/**
+ * /admin 아래는 이에오 운영자 페이지다. 주선사 콘솔과 토큰을 따로 보관해서 두 로그인이 섞이지 않게 한다.
+ * 페이지를 처음 열 때의 주소로 정하므로, 운영자 페이지와 주선사 콘솔은 서로 링크하지 않고 주소를 직접 연다
+ */
+export const ADMIN_SCOPE = window.location.pathname.startsWith('/admin')
+const TOKEN_PREFIX = ADMIN_SCOPE ? 'ieo.admin' : 'ieo'
+const ACCESS_KEY = `${TOKEN_PREFIX}.accessToken`
+const REFRESH_KEY = `${TOKEN_PREFIX}.refreshToken`
 const DEVICE_KEY = 'ieo.deviceId'
 
 export interface FieldError {
@@ -77,6 +83,14 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
     return parse<T>(await send(path, options))
   }
   return parse<T>(response)
+}
+
+/** 사진처럼 바이너리로 받는 API. 토큰을 붙이고 401이면 refresh 한 번 하고 다시 시도한다 */
+export async function apiBlob(path: string): Promise<Blob> {
+  let response = await send(path, {})
+  if (response.status === 401 && (await refreshTokens())) response = await send(path, {})
+  if (!response.ok) await parse<never>(response)
+  return response.blob()
 }
 
 async function send(path: string, { method = 'GET', body, auth = true, query }: RequestOptions) {

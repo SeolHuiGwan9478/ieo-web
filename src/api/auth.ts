@@ -7,7 +7,7 @@ export interface TokenResponse {
 
 export interface ExistingAccount {
   name: string
-  role: 'DRIVER' | 'BROKER'
+  role: 'DRIVER' | 'BROKER' | 'ADMIN'
   status: string
   joinedAt: string
   lastLoginAt: string | null

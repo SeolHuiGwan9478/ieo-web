@@ -301,7 +301,7 @@ function formatPhone(value: string) {
   return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`
 }
 
-function PhoneForm({ loading, onSubmit }: { loading: boolean; onSubmit: (phone: string) => void }) {
+export function PhoneForm({ loading, onSubmit }: { loading: boolean; onSubmit: (phone: string) => void }) {
   const { register, handleSubmit, formState } = useForm<{ phone: string }>()
   const phoneField = register('phone', {
     required: '휴대폰 번호를 입력해 주세요.',
@@ -332,7 +332,7 @@ function PhoneForm({ loading, onSubmit }: { loading: boolean; onSubmit: (phone: 
   )
 }
 
-function CodeForm({
+export function CodeForm({
   phone,
   demoCode,
   sending,

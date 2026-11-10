@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ApiError, onSessionExpired, tokens } from '../api/client'
+import { ADMIN_SCOPE, ApiError, onSessionExpired, tokens } from '../api/client'
 import { brokerApi, type MyBroker } from '../api/broker'
 
 /**
@@ -36,7 +36,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error
       }
     },
-    enabled: loggedIn,
+    // 운영자 페이지(/admin)는 주선사 회사가 없으므로 부르지 않는다
+    enabled: loggedIn && !ADMIN_SCOPE,
     retry: false,
   })
 
