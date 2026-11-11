@@ -503,7 +503,8 @@ export function OrderNewPage({ mode = 'create' }: { mode?: 'create' | 'edit' }) 
       cargoType: v.cargoType.trim(),
       weightKg: Number(v.weightKg),
       tonnage: v.tonnage,
-      bodyType: v.bodyType,
+      // 냉동·냉장 화물은 차종 칸을 잠그는데, 잠긴(disabled) 칸의 값은 폼 라이브러리가 비워 보내므로 여기서 다시 채운다
+      bodyType: v.cargoCategory === 'COLD' ? 'REFRIGERATED' : v.bodyType,
       loadingMethod: v.loadingMethod,
       fare: Number(v.fare),
       billedFare: v.billedFare !== '' ? Number(v.billedFare) : null,
@@ -588,7 +589,7 @@ export function OrderNewPage({ mode = 'create' }: { mode?: 'create' | 'edit' }) 
         <Card>
           <p className="text-[14px] text-ink-mid">사업자등록증과 운송주선사업 허가증이 승인되면 바로 오더를 올릴 수 있어요. 설정의 회사 서류에서 심사 상태를 볼 수 있어요.</p>
           <div className="mt-4">
-            <LinkButton to="/settings">설정으로</LinkButton>
+            <LinkButton to="/settings?tab=documents">회사 서류로</LinkButton>
           </div>
         </Card>
       </>
@@ -664,22 +665,23 @@ export function OrderNewPage({ mode = 'create' }: { mode?: 'create' | 'edit' }) 
               <Field label="상차 날짜" required type="date" disabled={locked} error={errorOf('pickupDate')} {...register('pickupDate', { required: '날짜를 골라 주세요.' })} />
               <Field label="상차 시각" required type="time" step={1800} disabled={locked} error={errorOf('pickupTime')} {...register('pickupTime', { required: '시각을 골라 주세요.' })} />
             </div>
+            {/* "직접 정하기" 입력 칸은 각자 고른 칩 바로 아래에 둔다. 한 줄에 몰아 두면 하차 기한 칸이 상차 쪽 자리로 밀려 헷갈린다 */}
             <div className="grid gap-4 sm:grid-cols-2">
-              <ChipGroup label="상차 가능 폭" value={pickupWindow} options={PICKUP_WINDOWS} disabled={locked} onChange={(v) => setValue('pickupWindow', v)} hint="정시는 30분 안에 상차를 시작해야 해요." />
-              <ChipGroup label="하차 기한" value={deadlineChoice} options={DROPOFF_DEADLINES} disabled={locked} onChange={(v) => setValue('dropoffDeadline', v)} />
-            </div>
-            {pickupWindow === 'CUSTOM' || deadlineChoice === 'CUSTOM' || errorOf('dropoffBy') ? (
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-3">
+                <ChipGroup label="상차 가능 폭" value={pickupWindow} options={PICKUP_WINDOWS} disabled={locked} onChange={(v) => setValue('pickupWindow', v)} hint="정시는 30분 안에 상차를 시작해야 해요." />
                 {pickupWindow === 'CUSTOM' ? (
                   <Field label="상차 마감" required type="datetime-local" disabled={locked} error={errorOf('pickupUntil')} {...register('pickupUntil', { required: '상차 마감을 골라 주세요.' })} />
                 ) : null}
+              </div>
+              <div className="space-y-3">
+                <ChipGroup label="하차 기한" value={deadlineChoice} options={DROPOFF_DEADLINES} disabled={locked} onChange={(v) => setValue('dropoffDeadline', v)} />
                 {deadlineChoice === 'CUSTOM' ? (
-                  <Field label="하차 기한" required type="datetime-local" disabled={locked} error={errorOf('dropoffBy')} {...register('dropoffBy', { required: '하차 기한을 골라 주세요.' })} />
+                  <Field label="하차 기한 시각" required type="datetime-local" disabled={locked} error={errorOf('dropoffBy')} {...register('dropoffBy', { required: '하차 기한을 골라 주세요.' })} />
                 ) : (
                   errorOf('dropoffBy') && <ErrorText>{errorOf('dropoffBy')}</ErrorText>
                 )}
               </div>
-            ) : null}
+            </div>
             {timeSummary ? <p className="rounded-xl bg-canvas px-3.5 py-2.5 text-[13.5px] font-medium text-ink-mid">{timeSummary}</p> : null}
           </div>
         </Card>
@@ -688,9 +690,16 @@ export function OrderNewPage({ mode = 'create' }: { mode?: 'create' | 'edit' }) 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Field label="품목" required placeholder="파레트 12개 (식품)" hint="인수증에 그대로 적혀요." disabled={locked} error={errorOf('cargoType')} {...register('cargoType', { required: '품목을 입력해 주세요.' })} />
             <Field label="무게 (kg)" required inputMode="numeric" placeholder="4500" disabled={locked} error={errorOf('weightKg')} {...num('weightKg', '무게', { min: 1, max: 50000 })} />
-            <SelectField label="화물 종류" required options={CARGO_CATEGORIES} hint="냉동·냉장을 고르면 차종도 냉동·냉장으로 바뀌어요." disabled={locked} {...register('cargoCategory')} />
+            <SelectField label="화물 종류" required options={CARGO_CATEGORIES} hint="냉동·냉장을 고르면 차종이 냉동·냉장으로 고정돼요." disabled={locked} {...register('cargoCategory')} />
             <SelectField label="톤수" required options={TONNAGES} disabled={locked} {...register('tonnage')} />
-            <SelectField label="차종" required options={BODY_TYPES} disabled={locked} {...register('bodyType')} />
+            <SelectField
+              label="차종"
+              required
+              options={BODY_TYPES}
+              disabled={locked || cargoCategory === 'COLD'}
+              hint={cargoCategory === 'COLD' ? '냉동·냉장 화물은 냉동·냉장 차량만 실을 수 있어요.' : undefined}
+              {...register('bodyType')}
+            />
             <SelectField label="상하차 방식" required options={LOADING_METHODS} disabled={locked} {...register('loadingMethod')} />
           </div>
         </Card>
@@ -701,7 +710,7 @@ export function OrderNewPage({ mode = 'create' }: { mode?: 'create' | 'edit' }) 
               label="청구운임 (원, 화주와 계약한 금액)"
               inputMode="numeric"
               placeholder="600000"
-              hint="주선사만 봐요. 비워도 돼요."
+              hint="비워도 돼요. 차주에게는 안 보여요."
               error={errorOf('billedFare')}
               {...register('billedFare', {
                 onChange: () => setFareTouched(false),
@@ -715,7 +724,7 @@ export function OrderNewPage({ mode = 'create' }: { mode?: 'create' | 'edit' }) 
               max={99.9}
               step={0.1}
               placeholder="10"
-              hint="청구운임 기준이에요. 회사 기본값을 미리 채워요."
+              hint="회사 기본값이 들어 있어요."
               disabled={locked}
               error={errorOf('feeRate')}
               {...register('feeRate', { onChange: () => setFareTouched(false), min: { value: 0, message: '0~99.9%' }, max: { value: 99.9, message: '0~99.9%' } })}
@@ -759,12 +768,12 @@ export function OrderNewPage({ mode = 'create' }: { mode?: 'create' | 'edit' }) 
                 label="지정 차주"
                 placeholder="오더 마켓에 공개 (누구나 요청)"
                 options={(drivers.data ?? []).map((d) => ({ value: String(d.driverUserId), label: `${d.name} · ${d.plateNumber ?? '차량 없음'}` }))}
-                hint="단골 차주에게만 지정할 수 있어요. 지정하면 그 차주에게만 보여요."
+                hint="지정하면 그 차주에게만 보여요."
                 disabled={locked}
                 {...register('targetDriverId')}
               />
               <SelectField label="확정 방식" options={Object.entries(CONFIRM_MODE).map(([value, label]) => ({ value, label }))} disabled={locked || Boolean(targetDriverId)} {...register('confirmMode')} />
-              <Field label="거래처 (화주)" placeholder="대한제강" maxLength={50} hint="주선사만 봐요." error={errorOf('customerName')} {...register('customerName')} />
+              <Field label="거래처 (화주)" placeholder="대한제강" maxLength={50} error={errorOf('customerName')} {...register('customerName')} />
             </div>
           ) : (
             <div>

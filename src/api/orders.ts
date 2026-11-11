@@ -36,6 +36,9 @@ export interface Order {
   id: number
   status: OrderStatus
   open: boolean
+  /** 마감 이유. 마감(CLOSED)일 때만. 상차 시간이 지나 서버가 자동 마감한 오더는 EXPIRED */
+  closeReason: 'BROKER' | 'EXPIRED' | 'CANCELED' | null
+  closeReasonLabel: string | null
   brokerId: number
   brokerName: string
   pickup: OrderSite

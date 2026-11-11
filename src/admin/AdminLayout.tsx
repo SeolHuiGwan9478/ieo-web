@@ -2,7 +2,8 @@ import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { NavLink } from 'react-router'
 import { adminApi, type AdminMe } from '../api/admin'
-import { Icon, Tag } from '../components/ui'
+import { Icon } from '../components/ui'
+import { AccountMenu } from '../layout/AccountMenu'
 
 /** 운영자 페이지 틀. 주선사 콘솔과 같은 생김새지만 메뉴는 차주·주선사 서류 심사뿐이다 */
 export function AdminLayout({ me, onLogout, children }: { me: AdminMe; onLogout: () => void; children: ReactNode }) {
@@ -23,10 +24,10 @@ export function AdminLayout({ me, onLogout, children }: { me: AdminMe; onLogout:
   ]
   return (
     <div className="flex min-h-screen">
-      <aside className="sticky top-0 flex h-screen w-[232px] shrink-0 flex-col border-r border-line bg-white">
-        <div className="px-6 pb-4 pt-6">
-          <img src="/ieo_wordmark_orange.svg" alt="ieo." className="h-7" />
-          <p className="mt-1 text-[12px] font-medium text-ink-sub">운영자</p>
+      <aside className="sticky top-0 flex h-screen w-[220px] shrink-0 flex-col border-r border-line bg-white">
+        <div className="px-5 pb-3 pt-5">
+          <img src="/ieo_wordmark_orange.svg" alt="ieo." className="h-6" />
+          <p className="mt-1 text-[12px] text-ink-sub">운영자</p>
         </div>
         <nav className="flex flex-col gap-0.5 px-3">
           {menu.map((item) => (
@@ -34,8 +35,8 @@ export function AdminLayout({ me, onLogout, children }: { me: AdminMe; onLogout:
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14.5px] font-semibold transition ${
-                  isActive ? 'bg-orange-50 text-orange-700' : 'text-ink-mid hover:bg-canvas hover:text-ink-strong'
+                `flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] font-medium transition ${
+                  isActive ? 'bg-orange-50 font-semibold text-orange-700' : 'text-ink-mid hover:bg-canvas hover:text-ink-strong'
                 }`
               }
             >
@@ -45,18 +46,10 @@ export function AdminLayout({ me, onLogout, children }: { me: AdminMe; onLogout:
             </NavLink>
           ))}
         </nav>
-        <div className="mt-auto border-t border-line px-5 py-4">
-          <p className="truncate text-[14px] font-bold text-ink-strong">{me.name ?? '운영자'}</p>
-          <div className="mt-1.5">
-            <Tag tone="orange">이에오 운영자</Tag>
-          </div>
-          <button onClick={onLogout} className="mt-3 inline-flex items-center gap-1.5 text-[13px] text-ink-sub hover:text-ink-mid">
-            <Icon name="logout" className="h-3.5 w-3.5" /> 로그아웃
-          </button>
-        </div>
+        <AccountMenu name={me.name ?? '운영자'} badges={[{ label: '이에오 운영자', tone: 'orange' }]} items={[]} onLogout={onLogout} />
       </aside>
       <main className="min-w-0 flex-1">
-        <div className="mx-auto max-w-6xl px-10 py-8">{children}</div>
+        <div className="mx-auto max-w-6xl px-8 py-7">{children}</div>
       </main>
     </div>
   )

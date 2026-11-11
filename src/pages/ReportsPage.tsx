@@ -18,7 +18,7 @@ export function ReportsPage() {
 
   return (
     <>
-      <PageHeader title="리포트" description="실제로 달린 결과예요. 오더에 적힌 호가가 아니라 완료된 운행의 운임·시간·대기로 계산해요." />
+      <PageHeader title="리포트" description="완료된 운행의 실제 운임·시간·대기로 계산해요." />
       <Tabs<Tab>
         value={tab}
         onChange={setTab}
@@ -39,7 +39,7 @@ export function ReportsPage() {
           <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-3">
             <Field label="시작" type="date" value={period.from} onChange={(e) => setPeriod((p) => ({ ...p, from: e.target.value }))} className="grid grid-cols-[auto_11rem] items-center gap-x-3 [&>span]:mb-0" />
             <Field label="종료" type="date" value={period.to} onChange={(e) => setPeriod((p) => ({ ...p, to: e.target.value }))} className="grid grid-cols-[auto_11rem] items-center gap-x-3 [&>span]:mb-0" />
-            <span className="text-[12.5px] text-ink-sub">한국 날짜, 양 끝 포함, 최대 1년</span>
+            <span className="text-[12.5px] text-ink-sub">최대 1년</span>
           </div>
           {tab === 'company' ? <CompanyTab period={period} /> : null}
           {tab === 'routes' ? <RoutesTab period={period} /> : null}

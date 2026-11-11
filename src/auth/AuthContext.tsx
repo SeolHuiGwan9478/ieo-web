@@ -39,6 +39,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // 운영자 페이지(/admin)는 주선사 회사가 없으므로 부르지 않는다
     enabled: loggedIn && !ADMIN_SCOPE,
     retry: false,
+    // 회사 서류가 승인되면(운영자가 처리) 새로고침 없이 오더 등록이 열리도록, 미인증 동안은 1분마다·창을 다시 볼 때 다시 읽는다
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => (query.state.data && !query.state.data.verified ? 60_000 : false),
   })
 
   const logout = useCallback(() => {

@@ -171,7 +171,7 @@ export function AdminReviewDetailPage<R extends ReviewRowBase, D extends ReviewD
         </div>
       ) : null}
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
         <Card padded={false}>
           <div className="flex flex-wrap gap-1.5 border-b border-line px-4 py-3">
             {documents.map((d) => {

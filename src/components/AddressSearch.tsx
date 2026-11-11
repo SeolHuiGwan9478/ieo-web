@@ -83,7 +83,7 @@ export function AddressSearch({ onSelect, onClose }: { onSelect: (result: Postco
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-strong/40 p-4" onClick={onClose}>
-      <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="address-search-title" className="w-full max-w-[536px] rounded-2xl bg-white p-3 shadow-xl sm:p-4" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="address-search-title" className="w-full max-w-[536px] rounded-xl bg-white p-3 shadow-xl sm:p-4" onClick={(e) => e.stopPropagation()}>
         <div className="mb-2 flex h-8 items-center justify-between">
           <h2 id="address-search-title" className="text-[16px] font-bold text-ink-strong">주소 검색</h2>
           <button ref={closeButton} type="button" className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-sub hover:bg-canvas hover:text-ink-mid" aria-label="주소 검색 닫기" onClick={onClose}><Icon name="close" className="h-5 w-5" /></button>

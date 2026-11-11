@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { membersApi } from '../api/people'
 import { ApiError } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
-import { Button, Card, ErrorText, Field, Modal, PageHeader, Table, Tag } from '../components/ui'
+import { Button, Card, ErrorText, Field, Modal, PageHeader, Table, Tabs, Tag } from '../components/ui'
 import { formatDateTime, formatPhone } from '../lib/format'
 
 /** 담당자 관리 (BRK-001 담당자 여러 명). 초대·직책·내보내기는 대표만 */
@@ -12,6 +12,7 @@ export function MembersPage() {
   const { me, logout } = useAuth()
   const queryClient = useQueryClient()
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [tab, setTab] = useState<'members' | 'pending'>('members')
   const [error, setError] = useState<string | null>(null)
   const members = useQuery({ queryKey: ['members'], queryFn: membersApi.list })
   const invitations = useQuery({ queryKey: ['member-invitations'], queryFn: membersApi.invitations })
@@ -35,12 +36,20 @@ export function MembersPage() {
     <>
       <PageHeader
         title="담당자"
-        description={limit ? `지금 플랜은 담당자를 ${limit}명까지 둘 수 있어요 (${used}/${limit}, 대기 중인 초대 포함).` : '담당자 수 제한이 없는 플랜이에요.'}
+        description={limit ? `담당자 ${used}/${limit}명 (대기 중인 초대 포함)` : undefined}
         action={isOwner ? <Button onClick={() => setInviteOpen(true)}>번호로 초대</Button> : null}
       />
+      <Tabs
+        value={tab}
+        onChange={setTab}
+        items={[
+          { value: 'members', label: '담당자', count: members.data?.length ?? 0 },
+          { value: 'pending', label: '보낸 초대', count: pending.length },
+        ]}
+      />
       <ErrorText>{error}</ErrorText>
-      <div className="mt-4 space-y-5">
-        <Card title="담당자" padded={false}>
+      <Card padded={false}>
+        {tab === 'members' ? (
           <Table
             rows={members.data ?? []}
             rowKey={(m) => m.userId}
@@ -75,8 +84,7 @@ export function MembersPage() {
               },
             ]}
           />
-        </Card>
-        <Card title={`수락 기다리는 초대 ${pending.length}건`} padded={false}>
+        ) : (
           <Table
             rows={pending}
             rowKey={(i) => i.id}
@@ -89,8 +97,10 @@ export function MembersPage() {
               { key: 'action', header: '', align: 'right', cell: (i) => (isOwner ? <Button variant="ghost" size="sm" onClick={() => cancel.mutate(i.id)}>취소</Button> : null) },
             ]}
           />
-        </Card>
-        <div className="flex items-center justify-between rounded-2xl border border-line/70 bg-white px-5 py-4">
+        )}
+      </Card>
+      <div className="mt-4 space-y-3">
+        <div className="flex items-center justify-between rounded-xl border border-line/70 bg-white px-5 py-4">
           <div>
             <p className="text-[14px] font-semibold">회사 나가기</p>
             <p className="text-[12.5px] text-ink-sub">나가면 이 회사의 콘솔을 더 쓸 수 없어요. 마지막 대표는 다른 담당자를 대표로 지정한 뒤에 나갈 수 있어요.</p>
@@ -99,7 +109,7 @@ export function MembersPage() {
             나가기
           </Button>
         </div>
-        <p className="text-[12.5px] text-ink-sub">초대받은 사람은 그 번호로 콘솔에 로그인하면 초대가 보여요. 문자 발송은 아직 붙지 않아서 초대한 사실을 따로 알려 주세요.</p>
+        <p className="text-[12.5px] text-ink-sub">초대받은 번호로 콘솔에 로그인하면 초대가 보여요. 문자 발송은 아직 없어서 따로 알려 주세요.</p>
       </div>
       <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={refresh} />
     </>

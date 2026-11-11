@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { driversApi } from '../api/people'
 import { ApiError } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
-import { Button, Card, ErrorText, Field, Modal, PageHeader, Table, Tag } from '../components/ui'
+import { Button, Card, ErrorText, Field, Modal, PageHeader, Table, Tabs, Tag } from '../components/ui'
 import { formatDateTime, formatPhone } from '../lib/format'
 
 /** 단골 차주 (BRK-002): 번호로 연결 요청 → 차주가 차량 앱에서 수락 → 위치 공유·지정 배차 */
@@ -12,6 +12,7 @@ export function DriversPage() {
   const { me } = useAuth()
   const queryClient = useQueryClient()
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [tab, setTab] = useState<'linked' | 'pending'>('linked')
   const [error, setError] = useState<string | null>(null)
   const drivers = useQuery({ queryKey: ['drivers'], queryFn: driversApi.list })
   const invitations = useQuery({ queryKey: ['driver-invitations'], queryFn: driversApi.invitations })
@@ -20,6 +21,8 @@ export function DriversPage() {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['drivers'] })
     queryClient.invalidateQueries({ queryKey: ['driver-invitations'] })
+    // 단골을 해제하면 운행 목록·상세의 "단골" 꼬리표와 위치 공개 여부가 바뀌므로 같이 새로 읽는다
+    queryClient.invalidateQueries({ queryKey: ['trips'] })
   }
   const fail = (e: unknown) => setError(e instanceof ApiError ? e.message : '서버와 연결할 수 없어요.')
   const unlink = useMutation({ mutationFn: driversApi.unlink, onSuccess: refresh, onError: fail })
@@ -31,12 +34,20 @@ export function DriversPage() {
     <>
       <PageHeader
         title="단골 차주"
-        description="연결된 차주는 우리 운행 중 위치가 보이고, 그 차주에게만 지정 배차를 보낼 수 있어요."
+        description="단골 차주는 운행 중 위치가 보이고, 지정 배차를 받을 수 있어요."
         action={isOwner ? <Button onClick={() => setInviteOpen(true)}>번호로 연결 요청</Button> : null}
       />
+      <Tabs
+        value={tab}
+        onChange={setTab}
+        items={[
+          { value: 'linked', label: '연결된 차주', count: drivers.data?.length ?? 0 },
+          { value: 'pending', label: '보낸 요청', count: pending.length },
+        ]}
+      />
       <ErrorText>{error}</ErrorText>
-      <div className="mt-4 space-y-5">
-        <Card title={`연결된 차주 ${drivers.data?.length ?? 0}명`} padded={false}>
+      <Card padded={false}>
+        {tab === 'linked' ? (
           <Table
             rows={drivers.data ?? []}
             rowKey={(d) => d.linkId}
@@ -59,8 +70,7 @@ export function DriversPage() {
               },
             ]}
           />
-        </Card>
-        <Card title={`수락 기다리는 요청 ${pending.length}건`} padded={false}>
+        ) : (
           <Table
             rows={pending}
             rowKey={(i) => i.id}
@@ -73,11 +83,11 @@ export function DriversPage() {
               { key: 'action', header: '', align: 'right', cell: (i) => (isOwner ? <Button variant="ghost" size="sm" onClick={() => cancel.mutate(i.id)}>취소</Button> : null) },
             ]}
           />
-        </Card>
-        <p className="text-[12.5px] text-ink-sub">
-          차주는 차량 앱을 켰을 때(정차 중) 요청을 보고 수락해요. 아직 Ieo에 가입하지 않은 번호도 요청할 수 있고, 가입하면 요청이 보여요. 문자 발송은 아직 붙지 않아서 요청한 사실을 따로 알려 주세요.
-        </p>
-      </div>
+        )}
+      </Card>
+      <p className="mt-3 text-[12.5px] text-ink-sub">
+        차주는 차량 앱(정차 중)에서 요청을 수락해요. 가입 전 번호도 요청할 수 있어요. 문자 발송은 아직 없어서 요청한 사실을 따로 알려 주세요.
+      </p>
       <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={refresh} />
     </>
   )

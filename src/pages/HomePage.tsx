@@ -10,7 +10,7 @@ import { DASHBOARD_UNITS, dashboardApi, type DashboardBucket, type DashboardPara
 import { useAuth } from '../auth/AuthContext'
 import { CompanyVerificationNotice } from '../components/CompanyVerificationNotice'
 import { Card, Icon, LinkButton, Loading, PageHeader, Stat, Table, Tag } from '../components/ui'
-import { formatDateTime, formatMinutes, formatPercent, formatWon, todayIso } from '../lib/format'
+import { formatDateTime, formatMinutes, formatPercent, formatWon, formatWonShort, todayIso } from '../lib/format'
 import { ORDER_STATUS, TRIP_TONE } from '../api/types'
 
 /** 첫 화면: 지금 처리할 것 + 기간별 실적 그래프 (일·주·월) */
@@ -28,7 +28,6 @@ export function HomePage() {
     <>
       <PageHeader
         title={me.name}
-        description="오늘 배차 상황과 기간별 실적을 한눈에 봐요."
         action={
           me.verified ? (
             <LinkButton to="/orders/new">
@@ -78,7 +77,7 @@ export function HomePage() {
             columns={[
               { key: 'route', header: '구간', cell: (o) => <Link to={`/orders/${o.id}`} className="font-semibold hover:text-orange-700">{o.pickup.name} → {o.dropoff.name}</Link> },
               { key: 'when', header: '상차', cell: (o) => formatDateTime(o.pickupFrom) },
-              { key: 'fare', header: '지급운임', align: 'right', cell: (o) => formatWon(o.fare) },
+              { key: 'fare', header: '지급운임', align: 'right', cell: (o) => formatWonShort(o.fare) },
               { key: 'req', header: '요청', align: 'right', cell: (o) => (o.pendingRequestCount ? <Tag tone="blue">{o.pendingRequestCount}명 대기</Tag> : <span className="text-ink-sub">-</span>) },
               { key: 'status', header: '', cell: (o) => <Tag tone={ORDER_STATUS[o.status].tone}>{o.open ? '모집 중' : ORDER_STATUS[o.status].label}</Tag> },
             ]}
@@ -169,7 +168,7 @@ function DashboardSection() {
             <Total label="오더 등록" value={`${data.total.orderCount}건`} color={COLOR.order} />
             <Total label="완료 운행" value={`${data.total.completedCount}건`} color={COLOR.completed} />
             <Total label="취소" value={`${data.total.canceledCount}건`} color={COLOR.canceled} />
-            <Total label="중개비 합계" value={formatWon(data.total.feeTotal)} color={COLOR.fee} hint={`청구운임을 입력한 완료 운행 ${data.total.pricedCount}건`} />
+            <Total label="중개비 합계" value={formatWonShort(data.total.feeTotal)} color={COLOR.fee} hint={`청구운임을 입력한 완료 운행 ${data.total.pricedCount}건`} />
           </div>
           <div className="grid gap-6 xl:grid-cols-2">
             <ChartBlock title="건수" description={`${data.unitLabel}별 오더 등록·완료 운행·취소`}>
@@ -199,7 +198,7 @@ function DashboardSection() {
             </ChartBlock>
           </div>
           <p className="mt-4 text-[12.5px] text-ink-sub">
-            오더는 등록한 날, 완료·취소는 그 처리를 한 날로 세요. 중개비는 청구운임에서 차주 지급운임을 뺀 금액이며, 청구운임을 입력한 완료 운행만 집계해요. 실제 입금 기준은 아니에요. 노선·상하차지·차주별 분석은 <Link to="/reports" className="font-semibold text-orange-700">리포트</Link>에서 봐요.
+            중개비 = 청구운임 − 지급운임. 청구운임을 적은 완료 운행만 세고, 실제 입금 기준은 아니에요. 노선·상하차지·차주별은 <Link to="/reports" className="font-semibold text-orange-700">리포트</Link>에서 봐요.
           </p>
         </>
       )}

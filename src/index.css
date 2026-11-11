@@ -12,7 +12,7 @@
   --color-orange-600: #F25A22;
   --color-orange-700: #C2410C;
 
-  --color-canvas: #F2F4F6;
+  --color-canvas: #F7F5F2; /* 따뜻한 회색 (주황 기운). 이전 값은 푸른 회색 #F2F4F6 */
   --color-line: #EDEDED;
   --color-ink-strong: #191F28;
   --color-ink-mid: #4E5968;

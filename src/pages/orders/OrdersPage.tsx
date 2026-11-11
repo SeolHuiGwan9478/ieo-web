@@ -28,7 +28,6 @@ export function OrdersPage() {
     <>
       <PageHeader
         title="오더"
-        description="올린 오더와 차주들의 배차 요청을 봐요."
         action={
           me?.verified ? (
             <LinkButton to="/orders/new">
@@ -102,8 +101,13 @@ export function OrdersPage() {
                 {
                   key: 'status',
                   header: '상태',
+                  // 상차 시간이 지난 모집 중 오더는 서버가 몇 분 안에 자동 마감한다(closeReason EXPIRED). 그 전까지는 OPEN이지만 "상차 시간 지남"으로 보여 준다
                   cell: (o) =>
-                    o.status === 'OPEN' && !o.open ? <Tag tone="gray">상차 시간 지남</Tag> : <Tag tone={ORDER_STATUS[o.status].tone} dot>{ORDER_STATUS[o.status].label}</Tag>,
+                    (o.status === 'OPEN' && !o.open) || o.closeReason === 'EXPIRED' ? (
+                      <Tag tone="gray">상차 시간 지남</Tag>
+                    ) : (
+                      <Tag tone={ORDER_STATUS[o.status].tone} dot>{ORDER_STATUS[o.status].label}</Tag>
+                    ),
                 },
               ]}
             />

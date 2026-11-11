@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useForm } from 'react-hook-form'
+import { useSearchParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { brokerApi, type BrokerPlan } from '../api/broker'
 import type { DocumentTypeItem } from '../api/admin'
@@ -7,30 +8,36 @@ import { settingsApi, type WaitPolicyInput } from '../api/settings'
 import { ApiError } from '../api/client'
 import { DOCUMENT_STATUS } from '../admin/documentStatus'
 import { useAuth } from '../auth/AuthContext'
-import { Button, Card, ErrorText, Field, Loading, PageHeader, SelectField, Tag } from '../components/ui'
+import { Button, Card, ErrorText, Field, Loading, PageHeader, SelectField, Tabs, Tag } from '../components/ui'
 import { formatBusinessNumber, formatDateTime, formatWon, todayIso } from '../lib/format'
 
-/** 설정: 회사 정보·정산 주기(대표), 대기비 정책(대표), 회사 서류(담당자 누구나), 플랜(대표) */
+type SettingsTab = 'company' | 'wait' | 'documents' | 'plan'
+const SETTINGS_TABS: { value: SettingsTab; label: string }[] = [
+  { value: 'company', label: '회사 정보' },
+  { value: 'wait', label: '대기비 정책' },
+  { value: 'documents', label: '회사 서류' },
+  { value: 'plan', label: '구독 플랜' },
+]
+
+/**
+ * 설정. 다른 목록 화면과 같은 틀(제목 → 탭 → 묶음 하나)이다. 탭은 주소의 ?tab= 으로 고른다 (플랜 올리기·회사 서류 안내가 그 탭으로 바로 보낸다). 네 탭 모두 다른 화면처럼 본문 폭을 다 쓰고, 입력 칸은 두 줄로 나란히 놓는다.
+ * 회사 정보·대기비 정책·플랜은 대표만 바꾸고, 회사 서류는 담당자 누구나 올린다
+ */
 export function SettingsPage() {
   const { me } = useAuth()
+  const [params, setParams] = useSearchParams()
   if (!me) return null
   const isOwner = me.position === 'OWNER'
+  const requested = params.get('tab')
+  const tab: SettingsTab = SETTINGS_TABS.some((t) => t.value === requested) ? (requested as SettingsTab) : 'company'
   return (
     <>
-      <PageHeader
-        title="설정"
-        description={isOwner ? '회사 정보, 정산 주기, 대기비 정책, 회사 서류, 플랜을 바꿔요.' : '회사 설정은 대표만 바꿀 수 있어요. 회사 서류는 올릴 수 있고, 나머지는 보기만 할 수 있어요.'}
-      />
-      <div className="grid gap-5 lg:grid-cols-2">
-        <CompanyCard isOwner={isOwner} />
-        <WaitPolicyCard isOwner={isOwner} />
-        <div className="lg:col-span-2">
-          <CompanyDocumentsCard />
-        </div>
-        <div className="lg:col-span-2">
-          <PlanCard isOwner={isOwner} />
-        </div>
-      </div>
+      <PageHeader title="설정" description={isOwner ? undefined : '회사 설정은 대표만 바꿀 수 있어요. 회사 서류는 올릴 수 있어요.'} />
+      <Tabs<SettingsTab> value={tab} onChange={(v) => setParams(v === 'company' ? {} : { tab: v }, { replace: true })} items={SETTINGS_TABS} />
+      {tab === 'company' ? <CompanyCard isOwner={isOwner} /> : null}
+      {tab === 'wait' ? <WaitPolicyCard isOwner={isOwner} /> : null}
+      {tab === 'documents' ? <CompanyDocumentsCard /> : null}
+      {tab === 'plan' ? <PlanCard isOwner={isOwner} /> : null}
     </>
   )
 }
@@ -68,8 +75,8 @@ function CompanyDocumentsCard() {
       }
     >
       <p className="mb-4 text-[13.5px] text-ink-sub">
-        둘 다 승인되어야 오더를 올릴 수 있어요. 이에오 운영자가 사업자등록증과 운송주선사업 허가증을 확인해요. 사진(JPG·PNG, 5MB 이하)으로 올려 주세요. 사업자등록증은
-        등록된 사업자번호 {formatBusinessNumber(me!.businessNumber)}로 국세청 진위확인을 함께 해요. 사진의 번호·허가 번호·상호·대표자가 회사 정보와 같아야 해요.
+        사업자등록증과 운송주선사업 허가증을 사진(JPG·PNG, 5MB 이하)으로 올리면 이에오 운영자가 확인해요. 둘 다 승인되어야 오더를 올릴 수 있어요.
+        사진의 사업자번호({formatBusinessNumber(me!.businessNumber)})·허가 번호·상호·대표자가 회사 정보와 같아야 해요.
       </p>
       {query.isPending ? <Loading rows={2} /> : null}
       {query.isError ? <ErrorText>{query.error.message}</ErrorText> : null}
@@ -196,6 +203,7 @@ function CompanyCard({ isOwner }: { isOwner: boolean }) {
   return (
     <Card title="회사 정보">
       <form onSubmit={handleSubmit((v) => update.mutate(v))} className="space-y-4">
+        <div className="grid gap-x-5 gap-y-4 md:grid-cols-2">
         <Field label="사업자등록번호" value={formatBusinessNumber(me!.businessNumber)} disabled hint="사업자등록번호는 바꿀 수 없어요." />
         <Field label="상호" disabled={!isOwner} error={formState.errors.name?.message} {...register('name', { required: '상호를 입력해 주세요.' })} />
         <Field label="운송주선사업 허가 번호" disabled={!isOwner} error={formState.errors.licenseNumber?.message} {...register('licenseNumber', { required: '허가 번호를 입력해 주세요.' })} />
@@ -206,7 +214,7 @@ function CompanyCard({ isOwner }: { isOwner: boolean }) {
           min={0}
           max={365}
           disabled={!isOwner}
-          hint="인수증 결제 운임을 인수증 전달 뒤 며칠 안에 지급하는지. 오더의 지급 예정일 기본값이자 차주 장부의 지급 예정일이 돼요."
+          hint="인수증 전달 뒤 며칠 안에 지급하는지. 오더의 지급 예정일 기본값이에요."
           error={formState.errors.settlementDays?.message}
           {...register('settlementDays', { required: true, min: { value: 0, message: '0~365일' }, max: { value: 365, message: '0~365일' } })}
         />
@@ -217,10 +225,11 @@ function CompanyCard({ isOwner }: { isOwner: boolean }) {
           max={99.9}
           step={0.1}
           disabled={!isOwner}
-          hint="오더를 올릴 때 지급운임에서 청구운임을 미리 계산해 줘요. 수수료율 = 수수료 ÷ 청구운임 (화주 계약 금액 기준). 0이면 계산하지 않아요."
+          hint="오더 등록 때 청구운임·지급운임을 이 비율로 미리 계산해요. 0이면 계산하지 않아요."
           error={formState.errors.defaultFeeRate?.message}
           {...register('defaultFeeRate', { required: true, min: { value: 0, message: '0~99.9%' }, max: { value: 99.9, message: '0~99.9%' } })}
         />
+        </div>
         <ErrorText>{error}</ErrorText>
         {isOwner ? (
           <div className="flex items-center justify-end gap-3">
@@ -277,7 +286,7 @@ function WaitPolicyCard({ isOwner }: { isOwner: boolean }) {
         )
       ) : (
         <form onSubmit={handleSubmit((v) => replace.mutate(v))} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-x-5 gap-y-4 md:grid-cols-4">
             <Field label="무료 대기 (분)" type="number" error={formState.errors.freeMinutes?.message} {...num('freeMinutes', 0)} />
             <Field label="단위 시간 (분)" type="number" error={formState.errors.unitMinutes?.message} {...num('unitMinutes', 1)} />
             <Field label="단위당 금액 (원)" type="number" error={formState.errors.unitAmount?.message} {...num('unitAmount', 0)} />
@@ -330,7 +339,7 @@ function PlanCard({ isOwner }: { isOwner: boolean }) {
         {PLANS.map((plan) => {
           const active = plan.code === current
           return (
-            <div key={plan.code} className={`flex flex-col rounded-2xl border p-4 ${active ? 'border-orange-500 bg-orange-50/60' : 'border-line'}`}>
+            <div key={plan.code} className={`flex flex-col rounded-xl border p-4 ${active ? 'border-orange-500 bg-orange-50/60' : 'border-line'}`}>
               <div className="mb-3 flex items-center justify-between">
                 <p className="text-[16px] font-bold">{plan.label}</p>
                 {active ? <Tag tone="orange">사용 중</Tag> : null}
@@ -344,7 +353,7 @@ function PlanCard({ isOwner }: { isOwner: boolean }) {
                 ))}
               </ul>
               {!active && isOwner ? (
-                <Button variant={plan.code === 'PRO' ? 'primary' : 'secondary'} size="sm" className="mt-auto" loading={changePlan.isPending} onClick={() => changePlan.mutate(plan.code)}>
+                <Button variant="secondary" size="sm" className="mt-auto" loading={changePlan.isPending} onClick={() => changePlan.mutate(plan.code)}>
                   이 플랜으로
                 </Button>
               ) : null}

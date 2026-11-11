@@ -392,6 +392,9 @@ function SignUpForm({
   onSubmit: (v: { name: string; consents: Record<ConsentType, boolean> }) => void
 }) {
   const { register, handleSubmit, formState } = useForm<{ name: string; terms: boolean; privacy: boolean; marketing: boolean }>()
+  // 체크박스는 글자색만 바뀌면 눈에 안 띄어서, 필수 동의가 빠지면 박스 아래에 문구를 따로 보여 준다
+  const missing = [formState.errors.terms && '이용약관', formState.errors.privacy && '개인정보 수집·이용'].filter(Boolean) as string[]
+  const consentError = missing.length ? `${missing.join('과 ')} 동의는 필수예요. 체크한 뒤 다시 눌러 주세요.` : null
   return (
     <form
       onSubmit={handleSubmit((v) => onSubmit({ name: v.name.trim(), consents: { TERMS: v.terms, PRIVACY: v.privacy, MARKETING: v.marketing } }))}
@@ -417,6 +420,7 @@ function SignUpForm({
         <Check label="개인정보 수집·이용 동의 (필수)" error={formState.errors.privacy?.message} {...register('privacy', { required: '필수 동의예요.' })} />
         <Check label="마케팅 정보 수신 (선택)" {...register('marketing')} />
       </div>
+      <ErrorText>{consentError}</ErrorText>
       <Button type="submit" className="w-full" loading={loading}>
         가입하고 시작하기
       </Button>

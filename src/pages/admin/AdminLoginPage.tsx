@@ -67,7 +67,7 @@ export function AdminLoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas px-4 py-10">
-      <div className="w-full max-w-sm rounded-2xl border border-line/70 bg-white p-8 shadow-[0_1px_3px_rgba(25,31,40,0.05)]">
+      <div className="w-full max-w-sm rounded-xl border border-line/70 bg-white p-8 shadow-[0_1px_3px_rgba(25,31,40,0.05)]">
         <img src="/ieo_wordmark_orange.svg" alt="ieo." className="h-8" />
         <p className="mt-5 text-[22px] font-bold tracking-tight text-ink-strong">운영자 로그인</p>
         <p className="mt-1.5 text-[14px] text-ink-sub">차주와 주선사의 서류를 심사하는 곳이에요. 이에오 운영자만 들어올 수 있어요.</p>

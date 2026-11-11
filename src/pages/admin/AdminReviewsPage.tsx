@@ -42,13 +42,13 @@ export function AdminReviewsPage<R extends ReviewRowBase, D extends ReviewDetail
         }}
         items={REVIEW_TABS.map((tab) => (tab.value === 'PENDING' ? { ...tab, count: query.data ? config.api.pendingOf(query.data) : undefined } : tab))}
       />
-      <form onSubmit={search} className="mb-4 flex gap-2">
+      <form onSubmit={search} className="mb-4 flex max-w-xl gap-2">
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder={config.searchPlaceholder}
           aria-label={`${config.subject} 검색`}
-          className="h-11 flex-1 rounded-xl border border-line bg-white px-4 text-[14px] text-ink-strong outline-none placeholder:text-ink-sub focus:border-orange-500"
+          className="h-10 flex-1 rounded-lg border border-line bg-white px-3 text-[14px] text-ink-strong outline-none placeholder:text-ink-sub/70 focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
         />
         <Button type="submit" variant="secondary">
           찾기

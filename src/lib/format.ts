@@ -2,22 +2,27 @@
 
 const KST = 'Asia/Seoul'
 
-export function formatDateTime(iso: string | null | undefined, options: { seconds?: boolean } = {}) {
-  if (!iso) return '-'
-  return new Intl.DateTimeFormat('ko-KR', {
-    timeZone: KST,
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: options.seconds ? '2-digit' : undefined,
-    hour12: false,
-  }).format(new Date(iso))
+/** 한국 시간의 연·월·일·시·분을 두 자리 문자열로 */
+function kstParts(iso: string) {
+  const parts: Record<string, string> = {}
+  for (const p of new Intl.DateTimeFormat('en-GB', { timeZone: KST, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).formatToParts(new Date(iso))) {
+    parts[p.type] = p.value
+  }
+  return { year: parts.year, month: parts.month, day: parts.day, hour: parts.hour === '24' ? '00' : parts.hour, minute: parts.minute, second: parts.second }
 }
 
+/** 11.09 12:49 꼴. 표·카드 어디서나 같은 폭이라 눈으로 맞추기 쉽다. 연도는 안 보여 준다 (지난해 건은 formatDate) */
+export function formatDateTime(iso: string | null | undefined, options: { seconds?: boolean } = {}) {
+  if (!iso) return '-'
+  const p = kstParts(iso)
+  return `${p.month}.${p.day} ${p.hour}:${p.minute}${options.seconds ? `:${p.second}` : ''}`
+}
+
+/** 2026.11.09 꼴 */
 export function formatDate(iso: string | null | undefined) {
   if (!iso) return '-'
-  return new Intl.DateTimeFormat('ko-KR', { timeZone: KST, year: 'numeric', month: 'numeric', day: 'numeric' }).format(new Date(iso))
+  const p = kstParts(iso)
+  return `${p.year}.${p.month}.${p.day}`
 }
 
 export function formatTime(iso: string | null | undefined) {
@@ -38,6 +43,16 @@ export function formatRelative(iso: string | null | undefined, now = Date.now())
 export function formatWon(value: number | null | undefined) {
   if (value === null || value === undefined) return '-'
   return `${value.toLocaleString('ko-KR')}원`
+}
+
+/** 목록·숫자 타일용 짧은 금액. 차량 앱과 같은 "45만 원" 꼴. 1만 원 미만은 원 단위, 그 위는 만 단위(소수 첫째 자리까지) */
+export function formatWonShort(value: number | null | undefined) {
+  if (value === null || value === undefined) return '-'
+  const abs = Math.abs(value)
+  if (abs < 10_000) return `${value.toLocaleString('ko-KR')}원`
+  const man = Math.round((value / 10_000) * 10) / 10
+  const text = Number.isInteger(man) ? man.toLocaleString('ko-KR') : man.toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+  return `${text}만 원`
 }
 
 export function formatMinutes(minutes: number | null | undefined) {

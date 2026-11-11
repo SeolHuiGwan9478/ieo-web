@@ -101,7 +101,7 @@ export function TripMap({ trip }: { trip: Trip }) {
       </div>
       {instance ? <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-ink-sub"><span>파랑 상차지 · 주황 하차지 · {stale ? '회색' : '보라'} 차량</span><button type="button" className="rounded-lg border border-line px-2.5 py-1.5 font-semibold text-ink-mid hover:bg-canvas" onClick={() => fit.current()}>전체 위치 보기</button></div> : null}
       {location ? <p className={`text-[12.5px] ${stale ? 'text-status-yellow' : 'text-ink-sub'}`}>마지막 수신 {formatDateTime(location.recordedAt, { seconds: true })} ({formatRelative(location.recordedAt)}){stale ? ' · 10분 이상 새 위치를 받지 못했어요.' : ''}</p> : <p className="text-[12.5px] text-ink-sub">{trip.locationVisible ? '차량 위치 수신 대기 중이에요. 상·하차지를 먼저 표시해요.' : '차량 위치는 비공개예요. 상·하차지만 표시해요.'}</p>}
-      <p className="text-[12px] text-ink-sub">운행 정보는 30초마다 확인해요. 차량 위치는 앱에서 마지막으로 전송한 시점 기준이에요.</p>
+      <p className="text-[12px] text-ink-sub">30초마다 새로 확인해요. 위치는 앱이 마지막으로 보낸 시점 기준이에요.</p>
     </div>
   )
 }

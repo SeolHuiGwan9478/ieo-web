@@ -1,35 +1,46 @@
 import { useEffect, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
 import { Link } from 'react-router'
 
+/*
+ * 공통 조각. 차량 앱(ieo-app design/README, 홈 화면)과 같은 생김새로 맞춘다 (2026-11-11 정리):
+ * - 연회색(canvas) 바탕 위에 테두리 없는 흰 묶음(둥글기 16px). 버튼·입력·칩은 10px, 꼬리표 6px
+ * - 글자: 제목 22 / 묶음 제목 16 굵게 + 회색 건수 / 본문·표 14 / 보조 13 / 힌트·표 머리 12.5
+ * - 높이: 버튼·입력 40, 작은 버튼 32
+ * - 주황은 한 화면에 주요 버튼 하나와 선택 상태에만. 보조 버튼은 연회색 바탕 (앱의 "다른 앱에서 받은 배차 등록"과 같음)
+ */
+
 /* ───────── 묶음 ───────── */
 
-export function Card({ children, className = '', title, action, padded = true }: { children: ReactNode; className?: string; title?: ReactNode; action?: ReactNode; padded?: boolean }) {
+export function Card({ children, className = '', title, count, action, padded = true }: { children: ReactNode; className?: string; title?: ReactNode; count?: number; action?: ReactNode; padded?: boolean }) {
   return (
-    <section className={`rounded-2xl border border-line/70 bg-white shadow-[0_1px_3px_rgba(25,31,40,0.05)] ${className}`}>
+    <section className={`rounded-2xl bg-white ${className}`}>
       {title !== undefined ? (
-        <header className="flex items-center justify-between border-b border-line px-5 py-3.5">
-          <h2 className="text-[15px] font-bold text-ink-strong">{title}</h2>
+        <header className="flex min-h-13 items-center justify-between gap-3 px-5 pt-4 pb-1">
+          <h2 className="flex items-baseline gap-2 text-[16px] font-bold text-ink-strong">
+            {title}
+            {count !== undefined ? <span className="text-[15px] font-semibold text-ink-sub tabular-nums">{count}</span> : null}
+          </h2>
           {action}
         </header>
       ) : null}
-      <div className={padded ? 'p-5' : ''}>{children}</div>
+      <div className={padded ? 'px-5 pb-5 pt-3' : 'pt-2'}>{children}</div>
     </section>
   )
 }
 
 export function PageHeader({ title, description, action, back }: { title: ReactNode; description?: ReactNode; action?: ReactNode; back?: { to: string; label: string } }) {
   return (
-    <div className="mb-6 flex items-end justify-between gap-4">
+    <div className="mb-5 flex items-end justify-between gap-4">
       <div className="min-w-0">
         {back ? (
           <Link to={back.to} className="mb-1 inline-flex items-center gap-1 text-[13px] text-ink-sub hover:text-ink-mid">
             <Icon name="back" className="h-3.5 w-3.5" /> {back.label}
           </Link>
         ) : null}
-        <h1 className="truncate text-[24px] font-bold tracking-[-0.01em] text-ink-strong">{title}</h1>
-        {description ? <p className="mt-1 text-[14px] text-ink-sub">{description}</p> : null}
+        <h1 className="truncate text-[22px] font-bold tracking-[-0.01em] text-ink-strong">{title}</h1>
+        {description ? <p className="mt-1 text-[13.5px] text-ink-sub">{description}</p> : null}
       </div>
-      {action ? <div className="flex shrink-0 gap-2">{action}</div> : null}
+      {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
     </div>
   )
 }
@@ -38,7 +49,7 @@ export function PageHeader({ title, description, action, back }: { title: ReactN
 export function Stat({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: 'blue' | 'green' | 'red' | 'yellow' }) {
   const color = tone ? { blue: 'text-status-blue', green: 'text-status-green', red: 'text-status-red', yellow: 'text-status-yellow' }[tone] : 'text-ink-strong'
   return (
-    <div className="rounded-2xl border border-line/70 bg-white px-5 py-4">
+    <div className="rounded-2xl bg-white px-5 py-4">
       <p className="text-[13px] text-ink-sub">{label}</p>
       <p className={`mt-1 text-[24px] font-bold tabular-nums tracking-[-0.01em] ${color}`}>{value}</p>
       {sub ? <p className="mt-0.5 text-[12px] text-ink-sub">{sub}</p> : null}
@@ -48,34 +59,36 @@ export function Stat({ label, value, sub, tone }: { label: string; value: ReactN
 
 /* ───────── 버튼 ───────── */
 
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
+  variant?: ButtonVariant
   size?: 'md' | 'sm'
   loading?: boolean
 }
 
-/** 주요 버튼은 주황(한 화면에 하나), 보조 버튼은 회색 */
+const buttonBase = 'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg font-semibold transition disabled:pointer-events-none disabled:opacity-40'
+const buttonDims = { md: 'h-10 px-4 text-[14px]', sm: 'h-8 px-3 text-[13px]' }
+const buttonLook: Record<ButtonVariant, string> = {
+  primary: 'bg-orange-600 text-white hover:bg-orange-700',
+  // 연회색 바탕(canvas) 위에 놓이는 페이지 머리 버튼도 보여야 해서 흰 바탕 + 옅은 테두리. 묶음 안에서도 같은 모양
+  secondary: 'border border-line bg-white text-ink-strong hover:bg-canvas',
+  ghost: 'bg-transparent text-ink-mid hover:bg-canvas hover:text-ink-strong',
+  danger: 'bg-status-red-bg text-status-red hover:bg-red-100',
+}
+
+/** 주요 버튼은 주황(한 화면에 하나), 보조 버튼은 흰 바탕에 테두리 */
 export function Button({ variant = 'primary', size = 'md', loading, disabled, className = '', children, ...rest }: ButtonProps) {
-  const base = 'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl font-bold transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40'
-  const dims = size === 'sm' ? 'h-9 px-3.5 text-[13px]' : 'h-11 px-5 text-[15px]'
-  const look = {
-    primary: 'bg-orange-600 text-white hover:bg-orange-700',
-    secondary: 'bg-canvas text-ink-mid hover:bg-line',
-    ghost: 'bg-transparent text-ink-mid hover:bg-canvas',
-    danger: 'bg-status-red-bg text-status-red hover:bg-red-100',
-  }[variant]
   return (
-    <button className={`${base} ${dims} ${look} ${className}`} disabled={disabled || loading} {...rest}>
+    <button className={`${buttonBase} ${buttonDims[size]} ${buttonLook[variant]} ${className}`} disabled={disabled || loading} {...rest}>
       {loading ? <Spinner /> : null}
       {children}
     </button>
   )
 }
 
-export function LinkButton({ to, children, variant = 'primary', className = '' }: { to: string; children: ReactNode; variant?: 'primary' | 'secondary'; className?: string }) {
-  const look = variant === 'primary' ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-canvas text-ink-mid hover:bg-line'
+export function LinkButton({ to, children, variant = 'primary', size = 'md', className = '' }: { to: string; children: ReactNode; variant?: 'primary' | 'secondary'; size?: 'md' | 'sm'; className?: string }) {
   return (
-    <Link to={to} className={`inline-flex h-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-5 text-[15px] font-bold transition ${look} ${className}`}>
+    <Link to={to} className={`${buttonBase} ${buttonDims[size]} ${buttonLook[variant]} ${className}`}>
       {children}
     </Link>
   )
@@ -88,20 +101,31 @@ export function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
 /* ───────── 입력 ───────── */
 
 const inputClass = (error?: string) =>
-  `h-11 w-full rounded-xl border bg-white px-3.5 text-[15px] text-ink-strong outline-none transition placeholder:text-ink-sub/70 focus:border-orange-500 focus:ring-2 focus:ring-orange-100 disabled:bg-canvas ${
+  `h-10 w-full rounded-lg border bg-white px-3 text-[14px] text-ink-strong outline-none transition placeholder:text-ink-sub/70 focus:border-orange-500 focus:ring-2 focus:ring-orange-100 disabled:bg-canvas disabled:text-ink-mid ${
     error ? 'border-status-red' : 'border-line'
   }`
+
+function FieldLabel({ label, required }: { label: string; required?: boolean }) {
+  return (
+    <span className="mb-1.5 flex items-center gap-1 text-[13px] font-medium text-ink-mid">
+      {label}
+      {required ? <span className="text-orange-600">*</span> : null}
+    </span>
+  )
+}
+
+function FieldNote({ error, hint }: { error?: string; hint?: string }) {
+  if (error) return <span className="mt-1 block text-[12.5px] text-status-red">{error}</span>
+  if (hint) return <span className="mt-1 block text-[12.5px] text-ink-sub">{hint}</span>
+  return null
+}
 
 function FieldFrame({ label, error, hint, className = '', children, required }: { label: string; error?: string; hint?: string; className?: string; children: ReactNode; required?: boolean }) {
   return (
     <label className={`block ${className}`}>
-      <span className="mb-1.5 flex items-center gap-1 text-[13px] font-semibold text-ink-mid">
-        {label}
-        {required ? <span className="text-orange-600">*</span> : null}
-      </span>
+      <FieldLabel label={label} required={required} />
       {children}
-      {error ? <span className="mt-1 block text-[12.5px] text-status-red">{error}</span> : null}
-      {!error && hint ? <span className="mt-1 block text-[12.5px] text-ink-sub">{hint}</span> : null}
+      <FieldNote error={error} hint={hint} />
     </label>
   )
 }
@@ -154,11 +178,8 @@ export function ChipGroup<T extends string>({ label, value, onChange, options, h
 }) {
   return (
     <div className={className} role="group" aria-label={label}>
-      <span className="mb-1.5 flex items-center gap-1 text-[13px] font-semibold text-ink-mid">
-        {label}
-        {required ? <span className="text-orange-600">*</span> : null}
-      </span>
-      <div className="flex flex-wrap gap-2">
+      <FieldLabel label={label} required={required} />
+      <div className="flex flex-wrap gap-1.5">
         {options.map((o) => {
           const active = o.value === value
           return (
@@ -168,7 +189,7 @@ export function ChipGroup<T extends string>({ label, value, onChange, options, h
               aria-pressed={active}
               disabled={disabled}
               onClick={() => onChange(o.value)}
-              className={`h-10 rounded-xl border px-3.5 text-[14px] font-semibold transition disabled:pointer-events-none disabled:opacity-40 ${
+              className={`h-9 rounded-lg border px-3 text-[13.5px] font-medium transition disabled:pointer-events-none disabled:opacity-40 ${
                 active ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-line bg-white text-ink-mid hover:bg-canvas'
               }`}
             >
@@ -177,8 +198,7 @@ export function ChipGroup<T extends string>({ label, value, onChange, options, h
           )
         })}
       </div>
-      {error ? <span className="mt-1 block text-[12.5px] text-status-red">{error}</span> : null}
-      {!error && hint ? <span className="mt-1 block text-[12.5px] text-ink-sub">{hint}</span> : null}
+      <FieldNote error={error} hint={hint} />
     </div>
   )
 }
@@ -187,7 +207,7 @@ export function ChipGroup<T extends string>({ label, value, onChange, options, h
 export function ErrorText({ children }: { children: ReactNode }) {
   if (!children) return null
   return (
-    <p className="flex items-start gap-2 rounded-xl bg-status-red-bg px-3.5 py-2.5 text-[13.5px] text-status-red">
+    <p className="flex items-start gap-2 rounded-lg bg-status-red-bg px-3.5 py-2.5 text-[13.5px] text-status-red">
       <Icon name="alert" className="mt-0.5 h-4 w-4 shrink-0" />
       <span>{children}</span>
     </p>
@@ -209,7 +229,7 @@ export function Tag({ tone, children, dot }: { tone: Tone; children: ReactNode; 
     orange: 'bg-orange-50 text-orange-700',
   }[tone]
   return (
-    <span className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-0.5 text-[12px] font-semibold ${look}`}>
+    <span className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[12px] font-semibold ${look}`}>
       {dot ? <span className="h-1.5 w-1.5 rounded-full bg-current" /> : null}
       {children}
     </span>
@@ -218,11 +238,11 @@ export function Tag({ tone, children, dot }: { tone: Tone; children: ReactNode; 
 
 export function Empty({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center gap-3 py-14 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-canvas text-ink-sub">
-        <Icon name="inbox" className="h-6 w-6" />
+    <div className="flex flex-col items-center gap-3 py-10 text-center">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-canvas text-ink-sub">
+        <Icon name="inbox" className="h-5 w-5" />
       </div>
-      <p className="text-[14px] text-ink-sub">{children}</p>
+      <p className="text-[13.5px] text-ink-sub">{children}</p>
       {action}
     </div>
   )
@@ -230,30 +250,35 @@ export function Empty({ children, action }: { children: ReactNode; action?: Reac
 
 export function Loading({ rows = 3 }: { rows?: number }) {
   return (
-    <div className="space-y-2.5 p-5">
+    <div className="space-y-2 p-5">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="h-10 animate-pulse rounded-xl bg-canvas" />
+        <div key={i} className="h-9 animate-pulse rounded-lg bg-canvas" />
       ))}
     </div>
   )
 }
 
 export function Tabs<T extends string>({ value, onChange, items }: { value: T; onChange: (v: T) => void; items: { value: T; label: string; count?: number }[] }) {
+  // 밑줄 탭: 왼쪽 정렬, 고른 탭만 주황 글자 + 2px 밑줄. 묶음 바로 위에 놓는다
   return (
-    <div className="mb-4 flex overflow-hidden rounded-xl border border-line bg-canvas">
+    <div role="tablist" className="mb-3 flex gap-1 border-b border-line">
       {items.map((item) => {
         const active = item.value === value
         return (
           <button
             key={item.value}
             type="button"
+            role="tab"
+            aria-selected={active}
             onClick={() => onChange(item.value)}
-            className={`flex h-9 flex-1 items-center justify-center gap-1.5 text-[14px] font-semibold transition ${
-              active ? 'bg-white text-ink-strong shadow-[0_1px_2px_rgba(25,31,40,0.08)]' : 'text-ink-sub hover:text-ink-mid'
+            className={`-mb-px inline-flex h-10 items-center gap-1.5 border-b-2 px-3 text-[14px] font-semibold transition ${
+              active ? 'border-orange-600 text-orange-700' : 'border-transparent text-ink-sub hover:text-ink-mid'
             }`}
           >
             {item.label}
-            {item.count !== undefined ? <span className={`rounded-md px-1.5 text-[11px] ${active ? 'bg-orange-50 text-orange-700' : 'bg-white/60'}`}>{item.count}</span> : null}
+            {item.count !== undefined ? (
+              <span className={`rounded-md px-1.5 text-[11px] font-bold ${active ? 'bg-orange-50 text-orange-700' : 'bg-canvas text-ink-sub'}`}>{item.count}</span>
+            ) : null}
           </button>
         )
       })}
@@ -276,7 +301,7 @@ export function Table<T>({ columns, rows, rowKey, onRowClick, empty }: {
         <thead>
           <tr className="border-b border-line text-left text-[12.5px] text-ink-sub">
             {columns.map((c) => (
-              <th key={c.key} className={`px-4 py-2.5 font-semibold ${c.align === 'right' ? 'text-right' : ''}`} style={{ width: c.width }}>
+              <th key={c.key} className={`px-4 py-2 font-medium ${c.align === 'right' ? 'text-right' : ''}`} style={{ width: c.width }}>
                 {c.header}
               </th>
             ))}
@@ -287,10 +312,10 @@ export function Table<T>({ columns, rows, rowKey, onRowClick, empty }: {
             <tr
               key={rowKey(row)}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={`border-b border-line/60 last:border-0 ${onRowClick ? 'cursor-pointer hover:bg-orange-50/40' : ''}`}
+              className={`border-b border-line/70 last:border-0 ${onRowClick ? 'cursor-pointer hover:bg-canvas/70' : ''}`}
             >
               {columns.map((c) => (
-                <td key={c.key} className={`px-4 py-3 align-middle ${c.align === 'right' ? 'text-right tabular-nums' : ''}`}>
+                <td key={c.key} className={`px-4 py-2.5 align-middle ${c.align === 'right' ? 'text-right tabular-nums' : ''}`}>
                   {c.cell(row)}
                 </td>
               ))}
@@ -306,9 +331,9 @@ export function Pagination({ page, size, total, onChange }: { page: number; size
   const last = Math.max(0, Math.ceil(total / size) - 1)
   if (total <= size) return null
   return (
-    <div className="flex items-center justify-between border-t border-line px-4 py-3 text-[13px] text-ink-sub">
-      <span>
-        전체 {total}건 · {page + 1} / {last + 1} 페이지
+    <div className="flex items-center justify-between border-t border-line px-4 py-2.5 text-[13px] text-ink-sub">
+      <span className="tabular-nums">
+        전체 {total}건 · {page + 1} / {last + 1}
       </span>
       <div className="flex gap-1">
         <Button variant="secondary" size="sm" disabled={page === 0} onClick={() => onChange(page - 1)}>
@@ -324,7 +349,7 @@ export function Pagination({ page, size, total, onChange }: { page: number; size
 
 export function DescList({ items, columns = 1 }: { items: { label: string; value: ReactNode }[]; columns?: 1 | 2 }) {
   return (
-    <dl className={`grid gap-x-8 gap-y-3 text-[14px] ${columns === 2 ? 'sm:grid-cols-2' : ''}`}>
+    <dl className={`grid gap-x-8 gap-y-2.5 text-[14px] ${columns === 2 ? 'sm:grid-cols-2' : ''}`}>
       {items.map((item) => (
         <div key={item.label} className="flex gap-4">
           <dt className="w-28 shrink-0 text-ink-sub">{item.label}</dt>
@@ -348,8 +373,8 @@ export function Modal({ open, onClose, title, children, width = 'max-w-lg' }: { 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-strong/40 p-4" onClick={onClose}>
       <div className={`w-full ${width} rounded-2xl bg-white p-6 shadow-xl`} onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-[17px] font-bold">{title}</h2>
-          <button type="button" onClick={onClose} className="rounded-lg p-1 text-ink-sub hover:bg-canvas" aria-label="닫기">
+          <h2 className="text-[16px] font-bold">{title}</h2>
+          <button type="button" onClick={onClose} className="rounded-md p-1 text-ink-sub hover:bg-canvas" aria-label="닫기">
             <Icon name="close" className="h-5 w-5" />
           </button>
         </div>
@@ -362,14 +387,14 @@ export function Modal({ open, onClose, title, children, width = 'max-w-lg' }: { 
 /** 잠긴 기능 안내 (PLAN-003) */
 export function UpgradeNotice({ feature, needed = '프로' }: { feature: string; needed?: string }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-orange-100 bg-orange-50/60 px-6 py-12 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-orange-600 shadow-sm">
-        <Icon name="lock" className="h-6 w-6" />
+    <div className="flex flex-col items-center gap-3 rounded-2xl bg-orange-50/60 px-6 py-12 text-center">
+      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-orange-600 shadow-sm">
+        <Icon name="lock" className="h-5 w-5" />
       </div>
-      <p className="text-[16px] font-bold text-ink-strong">{feature}은(는) {needed} 플랜부터 쓸 수 있어요</p>
-      <p className="text-[13.5px] text-ink-sub">설정에서 플랜을 올리면 바로 열려요. 아직 결제는 없어요.</p>
-      <LinkButton to="/settings" variant="secondary">
-        설정으로
+      <p className="text-[15px] font-bold text-ink-strong">{feature}은(는) {needed} 플랜부터 쓸 수 있어요</p>
+      <p className="text-[13px] text-ink-sub">설정의 구독 플랜에서 플랜을 올리면 바로 열려요. 아직 결제는 없어요.</p>
+      <LinkButton to="/settings?tab=plan" variant="secondary" size="sm">
+        구독 플랜으로
       </LinkButton>
     </div>
   )
@@ -395,6 +420,7 @@ const ICONS: Record<string, ReactNode> = {
   pin: <><path d="M12 21s7-6.5 7-11.5a7 7 0 0 0-14 0C5 14.5 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></>,
   clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   logout: <path d="M10 17l5-5-5-5M15 12H3M21 3v18" />,
+  chevron: <path d="m6 9 6 6 6-6" />,
 }
 
 export function Icon({ name, className = 'h-5 w-5' }: { name: keyof typeof ICONS | string; className?: string }) {

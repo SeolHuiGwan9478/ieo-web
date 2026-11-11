@@ -49,7 +49,7 @@ export function OrderDetailPage() {
           <span className="flex items-center gap-3">
             {o.pickup.name} <span className="text-ink-sub">→</span> {o.dropoff.name}
             <Tag tone={ORDER_STATUS[o.status].tone} dot>
-              {ORDER_STATUS[o.status].label}
+              {o.status === 'CLOSED' && o.closeReason === 'EXPIRED' ? '상차 시간 지남' : ORDER_STATUS[o.status].label}
             </Tag>
           </span>
         }
@@ -99,6 +99,20 @@ export function OrderDetailPage() {
           {others.length > 0 ? (
             <Card title="지난 요청" padded={false}>
               <Table rows={others} rowKey={(a) => a.requestId} columns={applicantColumns((a) => <Tag tone={REQUEST_STATUS[a.status].tone}>{REQUEST_STATUS[a.status].label}</Tag>)} />
+            </Card>
+          ) : null}
+          {o.status === 'CLOSED' ? (
+            <Card title={o.closeReason === 'EXPIRED' ? '상차 시간이 지나 마감됐어요' : o.closeReason === 'CANCELED' ? '배차가 취소되어 마감됐어요' : '내린 오더예요'}>
+              <p className="text-[14px] text-ink-mid">
+                {o.closeReason === 'EXPIRED'
+                  ? '상차 가능 시간이 끝날 때까지 배차되지 않아 자동으로 마감됐어요. 차주에게는 더 이상 보이지 않아요.'
+                  : o.closeReason === 'CANCELED'
+                    ? '확정됐던 배차를 취소하면서 오더도 내렸어요. 지난 요청은 아래에 남아 있어요.'
+                    : '마감된 오더는 다시 열 수 없어요. 같은 조건으로 다시 올리려면 "복사해서 올리기"를 눌러 주세요.'}
+              </p>
+              <LinkButton to={`/orders/new?from=${o.id}`} variant="primary" className="mt-4">
+                같은 조건으로 다시 올리기
+              </LinkButton>
             </Card>
           ) : null}
           {o.status === 'ASSIGNED' ? (
