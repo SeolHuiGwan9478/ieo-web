@@ -3,10 +3,10 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { tripsApi, type Trip, type TripTab } from '../../api/trips'
 import { TRIP_TONE, WAIT_STATUS } from '../../api/types'
-import { Card, Loading, PageHeader, Pagination, Table, Tabs, Tag } from '../../components/ui'
+import { Card, PageHeader, ListTable, LIST_PAGE_SIZE, Tabs, Tag } from '../../components/ui'
 import { formatDateTime, formatRelative } from '../../lib/format'
 
-const SIZE = 20
+const SIZE = LIST_PAGE_SIZE
 
 /** 진행 중 운행 (BRK-020). 위치·ETA는 30초마다 새로 받는다 */
 export function TripsPage() {
@@ -36,11 +36,9 @@ export function TripsPage() {
         ]}
       />
       <Card padded={false}>
-        {query.isPending ? (
-          <Loading rows={5} />
-        ) : (
-          <>
-            <Table
+        <ListTable
+              loading={query.isPending}
+              pagination={query.data ? { page: query.data.page, size: query.data.size, total: query.data.totalCount, onChange: setPage } : undefined}
               rows={query.data?.items ?? []}
               rowKey={(t) => t.id}
               onRowClick={(t) => navigate(`/trips/${t.id}`)}
@@ -75,10 +73,7 @@ export function TripsPage() {
                 { key: 'status', header: '상태', cell: (t) => <Status trip={t} /> },
                 { key: 'where', header: '위치·ETA', cell: (t) => <Where trip={t} /> },
               ]}
-            />
-            {query.data ? <Pagination page={query.data.page} size={query.data.size} total={query.data.totalCount} onChange={setPage} /> : null}
-          </>
-        )}
+        />
       </Card>
     </>
   )

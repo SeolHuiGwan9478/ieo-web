@@ -1,4 +1,5 @@
 import { useEffect, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router'
 
 /*
@@ -301,7 +302,7 @@ export function Table<T>({ columns, rows, rowKey, onRowClick, empty }: {
         <thead>
           <tr className="border-b border-line text-left text-[12.5px] text-ink-sub">
             {columns.map((c) => (
-              <th key={c.key} className={`px-4 py-2 font-medium ${c.align === 'right' ? 'text-right' : ''}`} style={{ width: c.width }}>
+              <th key={c.key} className={`sticky top-0 z-[1] bg-white px-4 py-2 font-medium shadow-[inset_0_-1px_0_var(--color-line)] ${c.align === 'right' ? 'text-right' : ''}`} style={{ width: c.width }}>
                 {c.header}
               </th>
             ))}
@@ -327,9 +328,44 @@ export function Table<T>({ columns, rows, rowKey, onRowClick, empty }: {
   )
 }
 
-export function Pagination({ page, size, total, onChange }: { page: number; size: number; total: number; onChange: (p: number) => void }) {
+/**
+ * 목록 화면의 표. 표 자리의 높이를 고정해서 줄 수가 달라져도(탭을 바꾸거나 다음 쪽으로 가도) 화면이 출렁이지 않는다.
+ * 줄이 넘치면 그 안에서 스크롤하고 머리줄은 붙어 있다. 아래 쪽 넘김 줄은 한 쪽뿐이어도 항상 보인다.
+ * pagination을 주면 서버가 나눈 쪽을, 안 주면 받은 rows를 pageSize(기본 10)줄씩 화면에서 나눈다
+ */
+export function ListTable<T>({ loading, pagination, pageSize = LIST_PAGE_SIZE, rows, ...table }: Parameters<typeof Table<T>>[0] & {
+  loading?: boolean
+  pagination?: { page: number; size: number; total: number; onChange: (p: number) => void }
+  pageSize?: number
+}) {
+  const [localPage, setLocalPage] = useState(0)
+  const lastLocal = Math.max(0, Math.ceil(rows.length / pageSize) - 1)
+  const page = Math.min(localPage, lastLocal)
+  const shown = pagination ? rows : rows.slice(page * pageSize, (page + 1) * pageSize)
+  return (
+    <>
+      <div className="h-[520px] overflow-auto">
+        {loading ? (
+          <Loading rows={6} />
+        ) : shown.length === 0 ? (
+          <div className="flex h-full items-center justify-center">
+            <Empty>{table.empty ?? '아직 없어요.'}</Empty>
+          </div>
+        ) : (
+          <Table<T> rows={shown} {...table} />
+        )}
+      </div>
+      {pagination ? <Pagination {...pagination} always /> : <Pagination page={page} size={pageSize} total={rows.length} onChange={setLocalPage} always />}
+    </>
+  )
+}
+
+/** 목록 한 쪽의 줄 수. 서버에 size로 보내는 값도 이것으로 맞춘다 */
+export const LIST_PAGE_SIZE = 10
+
+export function Pagination({ page, size, total, onChange, always }: { page: number; size: number; total: number; onChange: (p: number) => void; always?: boolean }) {
   const last = Math.max(0, Math.ceil(total / size) - 1)
-  if (total <= size) return null
+  if (total <= size && !always) return null
   return (
     <div className="flex items-center justify-between border-t border-line px-4 py-2.5 text-[13px] text-ink-sub">
       <span className="tabular-nums">

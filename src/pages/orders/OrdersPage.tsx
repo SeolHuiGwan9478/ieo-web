@@ -6,11 +6,11 @@ import type { OrderStatus } from '../../api/types'
 import { ORDER_STATUS } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
 import { CompanyVerificationNotice } from '../../components/CompanyVerificationNotice'
-import { Card, Icon, LinkButton, Loading, PageHeader, Pagination, Table, Tabs, Tag } from '../../components/ui'
+import { Card, Icon, LinkButton, PageHeader, ListTable, LIST_PAGE_SIZE, Tabs, Tag } from '../../components/ui'
 import { formatDateTime, formatWon } from '../../lib/format'
 
 type Filter = '' | OrderStatus
-const SIZE = 20
+const SIZE = LIST_PAGE_SIZE
 
 /** 오더 목록 (DSP-001~). 상태별 탭, 대기 중인 요청 수 */
 export function OrdersPage() {
@@ -51,11 +51,9 @@ export function OrdersPage() {
         ]}
       />
       <Card padded={false}>
-        {query.isPending ? (
-          <Loading rows={5} />
-        ) : (
-          <>
-            <Table
+        <ListTable
+              loading={query.isPending}
+              pagination={query.data ? { page: query.data.page, size: query.data.size, total: query.data.totalCount, onChange: setPage } : undefined}
               rows={query.data?.items ?? []}
               rowKey={(o) => o.id}
               onRowClick={(o) => navigate(`/orders/${o.id}`)}
@@ -110,10 +108,7 @@ export function OrdersPage() {
                     ),
                 },
               ]}
-            />
-            {query.data ? <Pagination page={query.data.page} size={query.data.size} total={query.data.totalCount} onChange={setPage} /> : null}
-          </>
-        )}
+        />
       </Card>
     </>
   )

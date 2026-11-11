@@ -22,10 +22,23 @@ import { AdminReviewDetailPage } from './pages/admin/AdminReviewDetailPage'
 
 /** 로그인 안 했으면 로그인으로, 소속 회사가 없으면 회사 등록으로 */
 function RequireCompany() {
-  const { loggedIn, loadingMe, noCompany } = useAuth()
+  const { loggedIn, loadingMe, noCompany, meError, logout } = useAuth()
   if (!loggedIn) return <Navigate to="/login" replace />
   if (loadingMe) return <FullPageMessage>불러오는 중…</FullPageMessage>
   if (noCompany) return <Navigate to="/register" replace />
+  // 회사에서 나온 계정처럼 내 회사를 읽지 못하면 모든 목록이 비어 보이므로, 이유를 알리고 다른 계정으로 들어가게 한다
+  if (meError) {
+    return (
+      <FullPageMessage>
+        <div className="text-center">
+          <p>{meError}</p>
+          <button onClick={logout} className="mt-3 text-[14px] font-semibold text-orange-700 underline underline-offset-2">
+            다른 계정으로 로그인
+          </button>
+        </div>
+      </FullPageMessage>
+    )
+  }
   return (
     <AppLayout>
       <Outlet />

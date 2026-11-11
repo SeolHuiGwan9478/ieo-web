@@ -4,10 +4,10 @@ import { useNavigate } from 'react-router'
 import type { ReviewDetailBase, ReviewFilter, ReviewRowBase } from '../../api/admin'
 import { REVIEW_TABS, businessCheckTag } from '../../admin/documentStatus'
 import type { ReviewKindConfig } from '../../admin/reviewKinds'
-import { Button, Card, Loading, PageHeader, Pagination, Table, Tabs, Tag } from '../../components/ui'
+import { Button, Card, PageHeader, ListTable, LIST_PAGE_SIZE, Tabs, Tag } from '../../components/ui'
 import { formatDateTime, formatRelative } from '../../lib/format'
 
-const SIZE = 20
+const SIZE = LIST_PAGE_SIZE
 
 /**
  * 심사 목록 (07 인계서 6.2, 13장). 차주 한 명(또는 회사 하나)이 한 줄. 심사 대기는 오래 기다린 쪽부터 보여 준다.
@@ -68,11 +68,9 @@ export function AdminReviewsPage<R extends ReviewRowBase, D extends ReviewDetail
         ) : null}
       </form>
       <Card padded={false}>
-        {query.isPending ? (
-          <Loading rows={5} />
-        ) : (
-          <>
-            <Table<R>
+        <ListTable<R>
+              loading={query.isPending}
+              pagination={query.data ? { page: query.data.page, size: query.data.size, total: query.data.totalCount, onChange: setPage } : undefined}
               rows={query.data?.items ?? []}
               rowKey={(r) => config.rowId(r)}
               onRowClick={(r) => navigate(config.detailPath(config.rowId(r)))}
@@ -116,10 +114,7 @@ export function AdminReviewsPage<R extends ReviewRowBase, D extends ReviewDetail
                 },
                 { key: 'again', header: '재제출', cell: (r) => (r.resubmitted ? <Tag tone="gray">재제출</Tag> : <span className="text-ink-sub">-</span>) },
               ]}
-            />
-            {query.data ? <Pagination page={query.data.page} size={query.data.size} total={query.data.totalCount} onChange={setPage} /> : null}
-          </>
-        )}
+        />
       </Card>
     </>
   )

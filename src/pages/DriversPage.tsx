@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { driversApi } from '../api/people'
 import { ApiError } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
-import { Button, Card, ErrorText, Field, Modal, PageHeader, Table, Tabs, Tag } from '../components/ui'
+import { Button, Card, ErrorText, Field, Modal, PageHeader, ListTable, Tabs, Tag } from '../components/ui'
 import { formatDateTime, formatPhone } from '../lib/format'
 
 /** 단골 차주 (BRK-002): 번호로 연결 요청 → 차주가 차량 앱에서 수락 → 위치 공유·지정 배차 */
@@ -48,7 +48,7 @@ export function DriversPage() {
       <ErrorText>{error}</ErrorText>
       <Card padded={false}>
         {tab === 'linked' ? (
-          <Table
+          <ListTable
             rows={drivers.data ?? []}
             rowKey={(d) => d.linkId}
             empty="아직 연결된 차주가 없어요. 자주 일하는 차주의 번호로 연결을 요청해 보세요."
@@ -71,7 +71,7 @@ export function DriversPage() {
             ]}
           />
         ) : (
-          <Table
+          <ListTable
             rows={pending}
             rowKey={(i) => i.id}
             empty="기다리는 요청이 없어요."

@@ -12,6 +12,8 @@ interface AuthState {
   loggedIn: boolean
   me: MyBroker | null | undefined
   loadingMe: boolean
+  /** 내 회사를 읽지 못한 이유 (예: 회사에서 나온 계정). 화면이 빈 목록 대신 이 문구를 보여 준다 */
+  meError: string | null
   noCompany: boolean
   login: (access: string, refresh: string) => void
   logout: () => void
@@ -57,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loggedIn,
       me: meQuery.data,
       loadingMe: loggedIn && meQuery.isPending,
+      meError: loggedIn && meQuery.isError ? meQuery.error.message : null,
       noCompany: loggedIn && meQuery.data === null,
       login: (access, refresh) => {
         tokens.set(access, refresh)
@@ -65,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       refreshMe: () => queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY }),
     }),
-    [loggedIn, meQuery.data, meQuery.isPending, logout, queryClient],
+    [loggedIn, meQuery.data, meQuery.isPending, meQuery.isError, meQuery.error, logout, queryClient],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

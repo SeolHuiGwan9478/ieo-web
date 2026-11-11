@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { membersApi } from '../api/people'
 import { ApiError } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
-import { Button, Card, ErrorText, Field, Modal, PageHeader, Table, Tabs, Tag } from '../components/ui'
+import { Button, Card, ErrorText, Field, Modal, PageHeader, ListTable, Tabs, Tag } from '../components/ui'
 import { formatDateTime, formatPhone } from '../lib/format'
 
 /** 담당자 관리 (BRK-001 담당자 여러 명). 초대·직책·내보내기는 대표만 */
@@ -50,7 +50,7 @@ export function MembersPage() {
       <ErrorText>{error}</ErrorText>
       <Card padded={false}>
         {tab === 'members' ? (
-          <Table
+          <ListTable
             rows={members.data ?? []}
             rowKey={(m) => m.userId}
             columns={[
@@ -85,7 +85,7 @@ export function MembersPage() {
             ]}
           />
         ) : (
-          <Table
+          <ListTable
             rows={pending}
             rowKey={(i) => i.id}
             empty="기다리는 초대가 없어요."

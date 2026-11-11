@@ -4,7 +4,7 @@ import { reportsApi, type ReportParams } from '../api/reports'
 import { hasFeature } from '../api/broker'
 import { ApiError } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
-import { Card, DescList, ErrorText, Field, Loading, PageHeader, Stat, Table, Tabs, Tag, UpgradeNotice } from '../components/ui'
+import { Card, DescList, ErrorText, Field, Loading, PageHeader, Stat, ListTable, Tabs, Tag, UpgradeNotice } from '../components/ui'
 import { formatDateTime, formatMinutes, formatPercent, formatPhone, formatWon, todayIso } from '../lib/format'
 
 type Tab = 'routes' | 'sites' | 'company' | 'drivers' | 'metrics'
@@ -75,7 +75,7 @@ function CompanyTab({ period }: { period: ReportParams }) {
             <Stat label="취소" value={r.canceledCount} tone={r.canceledCount > 0 ? 'red' : undefined} sub={`주선사 ${r.canceledByBrokerCount} · 차주 ${r.canceledByDriverCount}`} />
           </div>
           <Card title="차량별 이행률" padded={false}>
-            <Table
+            <ListTable
               rows={r.vehicles}
               rowKey={(v) => v.plateNumber}
               empty="기간 안에 배차된 운행이 없어요."
@@ -100,7 +100,7 @@ function RoutesTab({ period }: { period: ReportParams }) {
   return (
     <QueryState query={q}>
       <Card title="노선별 실제 운임·소요 시간" action={<span className="text-[12.5px] text-ink-sub">모든 회사의 완료 운행 · {q.data?.minSamples}건부터 표시</span>} padded={false}>
-        <Table
+        <ListTable
           rows={q.data?.routes ?? []}
           rowKey={(r) => `${r.pickupArea}>${r.dropoffArea}`}
           empty={`${q.data?.minSamples ?? 10}건 이상 완료된 노선이 아직 없어요.`}
@@ -132,7 +132,7 @@ function SitesTab({ period }: { period: ReportParams }) {
   return (
     <QueryState query={q}>
       <Card title="우리가 다니는 상하차지의 대기·작업 시간" action={<span className="text-[12.5px] text-ink-sub">평균은 그곳의 모든 회사 기록 · {q.data?.minSamples}건부터 표시</span>} padded={false}>
-        <Table
+        <ListTable
           rows={q.data?.sites ?? []}
           rowKey={(s) => s.siteId}
           empty="아직 기록이 충분한 상하차지가 없어요."
@@ -163,7 +163,7 @@ function DriversTab({ period }: { period: ReportParams }) {
   return (
     <QueryState query={q}>
       <Card title="함께 일한 차주의 이행 기록" action={<span className="text-[12.5px] text-ink-sub">정시 = 상차 예정 +30분 안 진입</span>} padded={false}>
-        <Table
+        <ListTable
           rows={q.data?.drivers ?? []}
           rowKey={(d) => d.driverUserId}
           empty="기간 안에 우리 오더를 맡은 차주가 없어요."
