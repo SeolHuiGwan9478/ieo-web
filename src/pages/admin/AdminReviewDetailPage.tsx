@@ -5,7 +5,7 @@ import type { BusinessCheck, DocumentItem, DocumentStatus, DocumentType, RejectR
 import { ApiError } from '../../api/client'
 import { DOCUMENT_STATUS, businessCheckTag } from '../../admin/documentStatus'
 import type { ReviewKindConfig } from '../../admin/reviewKinds'
-import { Button, Card, DescList, ErrorText, Loading, Modal, PageHeader, Tag, TextareaField } from '../../components/ui'
+import { Button, Card, DescList, ErrorText, Loading, Modal, PageHeader, Tabs, Tag, TextareaField } from '../../components/ui'
 import { formatDateTime } from '../../lib/format'
 
 /**
@@ -34,7 +34,6 @@ export function AdminReviewDetailPage<R extends ReviewRowBase, D extends ReviewD
   const submitted = useMemo(() => documents.filter((d) => d.latest !== null), [documents])
   // 처음에는 심사 대기 서류부터 보여 준다
   const current = submitted.find((d) => d.type === selected) ?? submitted.find((d) => d.latest?.status === 'PENDING') ?? submitted[0] ?? null
-  const currentIndex = current ? submitted.indexOf(current) : -1
   const pendingLeft = submitted.filter((d) => d.latest?.status === 'PENDING').length
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin'] })
@@ -171,40 +170,28 @@ export function AdminReviewDetailPage<R extends ReviewRowBase, D extends ReviewD
         </div>
       ) : null}
 
+      <Tabs<DocumentType>
+        value={current?.type ?? documents[0]?.type}
+        onChange={setSelected}
+        items={documents.map((d) => ({
+          value: d.type,
+          label: d.label,
+          disabled: !d.latest,
+          mark: d.latest ? (
+            <span className={`h-1.5 w-1.5 rounded-full ${dotClass(d.latest.status)}`} aria-label={DOCUMENT_STATUS[d.latest.status].label} />
+          ) : (
+            <span className="text-[11px] font-medium text-ink-sub">미제출</span>
+          ),
+        }))}
+      />
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
         <Card padded={false}>
-          <div className="flex flex-wrap gap-1.5 border-b border-line px-4 py-3">
-            {documents.map((d) => {
-              const active = current?.type === d.type
-              return (
-                <button
-                  key={d.type}
-                  type="button"
-                  disabled={!d.latest}
-                  onClick={() => setSelected(d.type)}
-                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold transition disabled:opacity-40 ${
-                    active ? 'bg-orange-50 text-orange-700' : 'text-ink-mid hover:bg-canvas'
-                  }`}
-                >
-                  {d.label}
-                  {!d.required ? <span className="text-[11px] font-medium text-ink-sub">선택</span> : null}
-                  {d.latest ? (
-                    <span className={`h-1.5 w-1.5 rounded-full ${dotClass(d.latest.status)}`} aria-label={DOCUMENT_STATUS[d.latest.status].label} />
-                  ) : (
-                    <span className="text-[11px] font-medium text-ink-sub">미제출</span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
           {current?.latest ? (
             <>
               <DocumentViewer
                 key={current.latest.id}
                 document={current.latest}
                 fetchFile={config.api.file}
-                onPrev={currentIndex > 0 ? () => setSelected(submitted[currentIndex - 1].type) : undefined}
-                onNext={currentIndex < submitted.length - 1 ? () => setSelected(submitted[currentIndex + 1].type) : undefined}
               />
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-4">
                 <div className="text-[14px]">
@@ -266,7 +253,7 @@ export function AdminReviewDetailPage<R extends ReviewRowBase, D extends ReviewD
             {data.events.length === 0 ? (
               <p className="text-[14px] text-ink-sub">아직 없어요.</p>
             ) : (
-              <ol className="space-y-3 text-[13.5px]">
+              <ol className="max-h-[320px] space-y-3 overflow-y-auto pr-1 text-[13.5px]">
                 {data.events.map((event) => (
                   <li key={event.id}>
                     <p>
@@ -380,13 +367,9 @@ function BusinessCheckCard({ check, pending, busy, rechecking, onRecheck }: { ch
 function DocumentViewer({
   document,
   fetchFile,
-  onPrev,
-  onNext,
 }: {
   document: DocumentItem
   fetchFile: (documentId: number) => Promise<Blob>
-  onPrev?: () => void
-  onNext?: () => void
 }) {
   const [url, setUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -413,15 +396,7 @@ function DocumentViewer({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-        <div className="flex gap-1">
-          <Button size="sm" variant="secondary" disabled={!onPrev} onClick={onPrev}>
-            이전 서류
-          </Button>
-          <Button size="sm" variant="secondary" disabled={!onNext} onClick={onNext}>
-            다음 서류
-          </Button>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-2 px-4 py-2.5">
         <div className="flex gap-1">
           <Button size="sm" variant="secondary" onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.25).toFixed(2))))}>
             축소

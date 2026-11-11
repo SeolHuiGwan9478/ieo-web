@@ -259,10 +259,11 @@ export function Loading({ rows = 3 }: { rows?: number }) {
   )
 }
 
-export function Tabs<T extends string>({ value, onChange, items }: { value: T; onChange: (v: T) => void; items: { value: T; label: string; count?: number }[] }) {
+export function Tabs<T extends string>({ value, onChange, items }: { value: T; onChange: (v: T) => void; items: { value: T; label: string; count?: number; mark?: ReactNode; disabled?: boolean }[] }) {
+  // mark는 글자 뒤에 붙는 작은 표시(상태 점 등), disabled는 고를 수 없는 탭
   // 밑줄 탭: 왼쪽 정렬, 고른 탭만 주황 글자 + 2px 밑줄. 묶음 바로 위에 놓는다
   return (
-    <div role="tablist" className="mb-3 flex gap-1 border-b border-line">
+    <div role="tablist" className="mb-3 flex flex-wrap gap-x-1 border-b border-line">
       {items.map((item) => {
         const active = item.value === value
         return (
@@ -271,12 +272,14 @@ export function Tabs<T extends string>({ value, onChange, items }: { value: T; o
             type="button"
             role="tab"
             aria-selected={active}
+            disabled={item.disabled}
             onClick={() => onChange(item.value)}
-            className={`-mb-px inline-flex h-10 items-center gap-1.5 border-b-2 px-3 text-[14px] font-semibold transition ${
+            className={`-mb-px inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 disabled:opacity-40 text-[14px] font-semibold transition ${
               active ? 'border-orange-600 text-orange-700' : 'border-transparent text-ink-sub hover:text-ink-mid'
             }`}
           >
             {item.label}
+            {item.mark}
             {item.count !== undefined ? (
               <span className={`rounded-md px-1.5 text-[11px] font-bold ${active ? 'bg-orange-50 text-orange-700' : 'bg-canvas text-ink-sub'}`}>{item.count}</span>
             ) : null}

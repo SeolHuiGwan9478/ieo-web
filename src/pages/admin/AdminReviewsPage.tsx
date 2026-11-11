@@ -33,7 +33,37 @@ export function AdminReviewsPage<R extends ReviewRowBase, D extends ReviewDetail
 
   return (
     <>
-      <PageHeader title={config.title} description={config.listDescription} />
+      <PageHeader
+        title={config.title}
+        description={config.listDescription}
+        action={
+            <form onSubmit={search} className="flex gap-2">
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder={config.searchPlaceholder}
+                aria-label={`${config.subject} 검색`}
+                className="h-10 w-64 rounded-lg border border-line bg-white px-3 text-[14px] text-ink-strong outline-none placeholder:text-ink-sub/70 focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+              />
+              <Button type="submit" variant="secondary">
+                찾기
+              </Button>
+              {q ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setDraft('')
+                    setQ('')
+                    setPage(0)
+                  }}
+                >
+                  지우기
+                </Button>
+              ) : null}
+            </form>
+        }
+      />
       <Tabs<ReviewFilter>
         value={status}
         onChange={(v) => {
@@ -42,31 +72,6 @@ export function AdminReviewsPage<R extends ReviewRowBase, D extends ReviewDetail
         }}
         items={REVIEW_TABS.map((tab) => (tab.value === 'PENDING' ? { ...tab, count: query.data ? config.api.pendingOf(query.data) : undefined } : tab))}
       />
-      <form onSubmit={search} className="mb-4 flex max-w-xl gap-2">
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={config.searchPlaceholder}
-          aria-label={`${config.subject} 검색`}
-          className="h-10 flex-1 rounded-lg border border-line bg-white px-3 text-[14px] text-ink-strong outline-none placeholder:text-ink-sub/70 focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-        />
-        <Button type="submit" variant="secondary">
-          찾기
-        </Button>
-        {q ? (
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setDraft('')
-              setQ('')
-              setPage(0)
-            }}
-          >
-            지우기
-          </Button>
-        ) : null}
-      </form>
       <Card padded={false}>
         <ListTable<R>
               loading={query.isPending}
