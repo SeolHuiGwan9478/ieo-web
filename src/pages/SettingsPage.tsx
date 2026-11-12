@@ -315,10 +315,11 @@ function WaitPolicyCard({ isOwner }: { isOwner: boolean }) {
   )
 }
 
-const PLANS: { code: BrokerPlan; label: string; items: string[] }[] = [
-  { code: 'BASIC', label: '베이직', items: ['담당자 1명', '오더 등록·배차 확정', '운행 위치·ETA, 대기 증빙, 전자인수증', '신뢰 지표'] },
-  { code: 'PRO', label: '프로', items: ['담당자 10명', '운행 데이터 리포트', '함께 일한 차주 이행 기록', '화주 공유 링크 무제한 (준비 중)'] },
-  { code: 'PRO_PLUS', label: '프로 플러스', items: ['담당자 무제한', '리포트 내려받기 (준비 중)', '외부 API 연동 (준비 중)', '오더 템플릿 무제한 (준비 중)'] },
+/** 30일 가격은 서버 BrokerPlan과 같게 (요금제 12장). 결제는 데모 */
+const PLANS: { code: BrokerPlan; label: string; price: number; items: string[] }[] = [
+  { code: 'BASIC', label: '베이직', price: 0, items: ['담당자 1명', '오더 등록·배차 확정', '운행 위치·ETA, 대기 증빙, 인수증 사진', '신뢰 지표'] },
+  { code: 'PRO', label: '프로', price: 39000, items: ['담당자 10명', '운행 데이터 리포트', '함께 일한 차주 이행 기록', '화주 공유 링크 무제한 (준비 중)'] },
+  { code: 'PRO_PLUS', label: '프로 플러스', price: 99000, items: ['담당자 무제한', '리포트 내려받기 (준비 중)', '외부 API 연동 (준비 중)', '오더 템플릿 무제한 (준비 중)'] },
 ]
 
 function PlanCard({ isOwner }: { isOwner: boolean }) {
@@ -340,10 +341,14 @@ function PlanCard({ isOwner }: { isOwner: boolean }) {
           const active = plan.code === current
           return (
             <div key={plan.code} className={`flex flex-col rounded-xl border p-4 ${active ? 'border-orange-500 bg-orange-50/60' : 'border-line'}`}>
-              <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center justify-between">
                 <p className="text-[16px] font-bold">{plan.label}</p>
                 {active ? <Tag tone="orange">사용 중</Tag> : null}
               </div>
+              <p className="mb-3 mt-1 text-[15px] font-bold text-ink">
+                {plan.price === 0 ? '무료' : `${formatWon(plan.price)}`}
+                {plan.price > 0 ? <span className="ml-1 text-[12.5px] font-normal text-ink-sub">/ 30일</span> : null}
+              </p>
               <ul className="mb-4 space-y-1.5 text-[13.5px] text-ink-mid">
                 {plan.items.map((item) => (
                   <li key={item} className="flex gap-2">
@@ -353,15 +358,15 @@ function PlanCard({ isOwner }: { isOwner: boolean }) {
                 ))}
               </ul>
               {!active && isOwner ? (
-                <Button variant="secondary" size="sm" className="mt-auto" loading={changePlan.isPending} onClick={() => changePlan.mutate(plan.code)}>
-                  이 플랜으로
+                <Button variant={plan.price > 0 ? 'primary' : 'secondary'} size="sm" className="mt-auto" loading={changePlan.isPending} onClick={() => changePlan.mutate(plan.code)}>
+                  {plan.price > 0 ? `구독하기 · ${formatWon(plan.price)}` : '베이직으로 내리기'}
                 </Button>
               ) : null}
             </div>
           )
         })}
       </div>
-      <p className="mt-3 text-[12.5px] text-ink-sub">{isOwner ? '아직 결제가 없어서 바로 바뀌어요. 내려도 담당자와 데이터는 지우지 않고 보기만 제한돼요.' : '플랜은 대표만 바꿀 수 있어요.'}</p>
+      <p className="mt-3 text-[12.5px] text-ink-sub">{isOwner ? '시연용 결제예요. 누르면 바로 결제된 것으로 처리되고 실제 돈은 나가지 않아요. 내려도 담당자와 데이터는 지우지 않아요.' : '플랜은 대표만 바꿀 수 있어요.'}</p>
       <div className="mt-3"><ErrorText>{error}</ErrorText></div>
     </Card>
   )

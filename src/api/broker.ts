@@ -8,6 +8,8 @@ export type MemberPosition = 'OWNER' | 'STAFF'
 export interface PlanInfo {
   plan: BrokerPlan
   planLabel: string
+  /** 30일 가격(원). 결제는 데모라 고르면 바로 바뀐다 */
+  price: number
   features: { code: BrokerFeature; label: string }[]
   limits: { members: number | null; shareLinksPerMonth: number | null; orderTemplates: number | null }
   startedAt: string | null

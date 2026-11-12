@@ -5,7 +5,7 @@ import { Check } from 'lucide-react'
 export const SCENES = [
   { label: '오더를 올리고 배차 요청을 확정해요', caption: '배차 요청' },
   { label: '운행 현황과 도착 예정을 전화 없이 봐요', caption: '운행 현황' },
-  { label: '대기 증빙과 전자인수증을 한곳에서 받아요', caption: '증빙·인수증' },
+  { label: '대기 증빙과 인수증 사진을 한곳에서 받아요', caption: '증빙·인수증' },
 ] as const
 
 const INTERVAL_MS = 4200
@@ -117,9 +117,9 @@ function TripsScene({ tick }: { tick: number }) {
   )
 }
 
-/** 대기 증빙과 인수증 장면: 서명이 들어오면 '서명 완료'로 바뀐다 */
+/** 대기 증빙과 인수증 장면: 기사님이 찍은 종이 인수증 사진이 들어온다 */
 function ProofScene({ tick }: { tick: number }) {
-  const signed = tick >= 2
+  const arrived = tick >= 2
   return (
     <div className="space-y-3">
       <div className="rounded-xl bg-status-yellow-bg p-3 text-status-yellow">
@@ -129,12 +129,12 @@ function ProofScene({ tick }: { tick: number }) {
           <span className="text-[18px] font-extrabold">대기비 30,000원</span>
         </p>
       </div>
-      <div className={`flex items-center justify-between rounded-xl p-3 transition-colors ${signed ? 'bg-status-green-bg' : 'bg-canvas'}`}>
+      <div className={`flex items-center justify-between rounded-xl p-3 transition-colors ${arrived ? 'bg-status-green-bg' : 'bg-canvas'}`}>
         <div>
-          <p className="text-[12px] font-bold text-ink-mid">전자인수증 · 대전 유성</p>
-          <p className={`mt-0.5 text-[14px] font-bold ${signed ? 'text-status-green' : 'text-ink-sub'}`}>{signed ? '수하인 서명 완료' : tick >= 1 ? '수하인 서명 중…' : 'QR 전달됨'}</p>
+          <p className="text-[12px] font-bold text-ink-mid">인수증 · 대전 유성</p>
+          <p className={`mt-0.5 text-[14px] font-bold ${arrived ? 'text-status-green' : 'text-ink-sub'}`}>{arrived ? '사진 2장 도착' : tick >= 1 ? '기사님이 사진 보내는 중…' : '하차 완료'}</p>
         </div>
-        <span className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${signed ? 'bg-status-green text-white' : 'bg-white text-ink-sub'}`}>
+        <span className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${arrived ? 'bg-status-green text-white' : 'bg-white text-ink-sub'}`}>
           <Check className="h-4 w-4" strokeWidth={3} />
         </span>
       </div>
