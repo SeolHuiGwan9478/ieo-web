@@ -1,13 +1,14 @@
 import { TripMap } from '../../components/TripMap'
 import { useQuery } from '@tanstack/react-query'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { publicPageUrl, tripsApi, type TripStop } from '../../api/trips'
+import { publicPageUrl, tripsApi, type Receipt, type TripStop } from '../../api/trips'
 import { ApiError } from '../../api/client'
-import { PROOF_STATUS, TRIP_TONE, WAIT_STATUS } from '../../api/types'
-import { Card, DescList, ErrorText, Icon, Loading, PageHeader, Tag } from '../../components/ui'
+import { TRIP_TONE, WAIT_STATUS } from '../../api/types'
+import { Button, Card, DescList, ErrorText, Icon, Loading, Modal, PageHeader, Tag } from '../../components/ui'
 import { formatDateTime, formatMinutes, formatPhone, formatWon } from '../../lib/format'
 
-/** 운행 상세 (BRK-020, 021): 위치·ETA, 상하차지 도착·작업·이탈 시각, 대기 증빙, 전자인수증 */
+/** 운행 상세 (BRK-020, 021): 위치·ETA, 상하차지 도착·작업·이탈 시각, 대기 증빙, 인수증 사진 */
 export function TripDetailPage() {
   const tripId = Number(useParams().tripId)
   const query = useQuery({ queryKey: ['trips', tripId], queryFn: () => tripsApi.get(tripId), refetchInterval: 30_000 })
@@ -105,23 +106,13 @@ export function TripDetailPage() {
               ]}
             />
           </Card>
-          <Card title="전자인수증">
+          <Card title="인수증">
             {t.receipt ? (
-              <div className="space-y-3">
-                <DescList
-                  items={[
-                    { label: '상태', value: <Tag tone={t.receipt.status === 'PENDING' ? 'gray' : 'green'}>{PROOF_STATUS[t.receipt.status]}</Tag> },
-                    { label: '수하인', value: t.receipt.signerName ?? '-' },
-                    { label: '서명 시각', value: formatDateTime(t.receipt.signedAt) },
-                    { label: '종이 인수증', value: t.receipt.hasPaperPhoto ? '사진 있음' : '-' },
-                    ...(t.receipt.issueNote ? [{ label: '이상 사항', value: <span className="text-status-red">{t.receipt.issueNote}</span> }] : []),
-                  ]}
-                />
-                <ExternalLink href={publicPageUrl(t.receipt.path)}>인수증 열기</ExternalLink>
-                <p className="text-[12px] text-ink-sub">링크는 {formatDateTime(t.receipt.expiresAt)}까지 열려요.</p>
-              </div>
+              <ReceiptPhotos tripId={t.id} receipt={t.receipt} />
+            ) : t.paymentType === 'RECEIPT' ? (
+              <p className="text-[13.5px] text-ink-sub">기사님이 아직 종이 인수증을 보내지 않았어요.</p>
             ) : (
-              <p className="text-[13.5px] text-ink-sub">수하인이 서명하거나 차주가 종이 인수증 사진을 올리면 여기 보여요.</p>
+              <p className="text-[13.5px] text-ink-sub">{t.paymentTypeLabel} 운행이라 인수증이 없어요.</p>
             )}
           </Card>
           <Card title="시각">
@@ -178,6 +169,121 @@ function StopView({ stop }: { stop: TripStop }) {
       ) : stop.workStartedAt ? (
         <p className="text-[12.5px] text-ink-sub">대기 시간·대기비는 차주가 대기 증빙 링크를 만든 뒤에 보여요.</p>
       ) : null}
+    </div>
+  )
+}
+
+/** 받아 온 사진. 아직 받는 중이면 undefined, 못 받았으면 null */
+type LoadedPhoto = { url: string; extension: string } | null | undefined
+
+/**
+ * 차주가 보낸 종이 인수증 사진 (POD-007). 로그인 토큰이 필요한 API라 <img src>로 바로 못 열고, 받아서 blob 주소로 보여 준다.
+ * 보낸 뒤에는 사진이 바뀌지 않으므로 사진 id가 같으면 다시 받지 않는다
+ */
+function ReceiptPhotos({ tripId, receipt }: { tripId: number; receipt: Receipt }) {
+  const { photos } = receipt
+  const [loaded, setLoaded] = useState<Record<number, LoadedPhoto>>({})
+  const [openIndex, setOpenIndex] = useState<number | null>(null)
+  const photoKey = photos.map((photo) => photo.id).join(',')
+
+  useEffect(() => {
+    let active = true
+    const objectUrls: string[] = []
+    for (const photo of photos) {
+      tripsApi
+        .receiptPhoto(photo)
+        .then((blob) => {
+          if (!active) return
+          const url = URL.createObjectURL(blob)
+          objectUrls.push(url)
+          setLoaded((prev) => ({ ...prev, [photo.id]: { url, extension: blob.type === 'image/png' ? 'png' : 'jpg' } }))
+        })
+        .catch(() => {
+          if (active) setLoaded((prev) => ({ ...prev, [photo.id]: null }))
+        })
+    }
+    return () => {
+      active = false
+      objectUrls.forEach((url) => URL.revokeObjectURL(url))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photoKey])
+
+  const count = photos.length
+  const move = useCallback((step: number) => setOpenIndex((i) => (i === null ? i : (i + step + count) % count)), [count])
+  useEffect(() => {
+    if (openIndex === null || count < 2) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') move(-1)
+      if (e.key === 'ArrowRight') move(1)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [openIndex, count, move])
+
+  const close = useCallback(() => setOpenIndex(null), [])
+  const open = openIndex === null ? null : loaded[photos[openIndex].id]
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[13.5px] text-ink-mid">
+        <span className="font-semibold text-ink-strong">{formatDateTime(receipt.sentAt)}</span> 보냄 · 사진 {count}장
+      </p>
+      <ul className="flex flex-wrap gap-2">
+        {photos.map((photo, index) => {
+          const item = loaded[photo.id]
+          return (
+            <li key={photo.id}>
+              <button
+                type="button"
+                onClick={() => setOpenIndex(index)}
+                disabled={!item}
+                aria-label={`인수증 사진 ${index + 1} 크게 보기`}
+                className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-xl border border-line bg-canvas text-[12px] text-ink-sub transition hover:border-orange-600 disabled:pointer-events-none"
+              >
+                {item ? <img src={item.url} alt={`인수증 사진 ${index + 1}`} className="h-full w-full object-cover" /> : item === null ? '못 불러옴' : '불러오는 중'}
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      <p className="text-[12px] text-ink-sub">사진을 누르면 크게 볼 수 있어요.</p>
+
+      <Modal open={openIndex !== null} onClose={close} title={`인수증 사진 ${(openIndex ?? 0) + 1} / ${count}`} width="max-w-3xl">
+        {open ? (
+          <>
+            <div className="flex max-h-[68vh] justify-center overflow-auto rounded-xl bg-canvas">
+              <img src={open.url} alt={`인수증 사진 ${(openIndex ?? 0) + 1}`} className="max-h-[68vh] object-contain" />
+            </div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex gap-2">
+                {count > 1 ? (
+                  <>
+                    <Button size="sm" variant="secondary" onClick={() => move(-1)}>
+                      이전
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => move(1)}>
+                      다음
+                    </Button>
+                  </>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-4">
+                <ExternalLink href={open.url}>새 탭에서 열기</ExternalLink>
+                <a
+                  href={open.url}
+                  download={`인수증_운행${tripId}_${(openIndex ?? 0) + 1}.${open.extension}`}
+                  className="text-[14px] font-semibold text-orange-700 hover:underline"
+                >
+                  내려받기
+                </a>
+              </div>
+            </div>
+          </>
+        ) : (
+          <ErrorText>사진을 불러오지 못했어요.</ErrorText>
+        )}
+      </Modal>
     </div>
   )
 }

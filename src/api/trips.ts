@@ -1,5 +1,5 @@
-import { api } from './client'
-import type { DeliveryProofStatus, PaymentType, Tonnage, TripStatus, WaitStatus } from './types'
+import { api, apiBlob } from './client'
+import type { PaymentType, Tonnage, TripStatus, WaitStatus } from './types'
 
 export type TripTab = 'IN_PROGRESS' | 'SCHEDULED' | 'FINISHED'
 
@@ -29,14 +29,17 @@ export interface TripStop {
   waitProof: WaitProofSummary | null
 }
 
-export interface Receipt {
-  status: DeliveryProofStatus
-  signerName: string | null
-  signedAt: string | null
-  hasPaperPhoto: boolean
-  issueNote: string | null
+/** path는 로그인 토큰을 붙여 받는 사진 주소 */
+export interface ReceiptPhoto {
+  id: number
   path: string
-  expiresAt: string
+  uploadedAt: string
+}
+
+/** 차주가 보낸 종이 인수증 사진 (POD-007). 보낸 뒤에만 있고 만료가 없다 */
+export interface Receipt {
+  sentAt: string
+  photos: ReceiptPhoto[]
 }
 
 /** 주선사 콘솔 운행 (서버 BrokerTripResponse) */
@@ -84,9 +87,10 @@ export const tripsApi = {
   list: (params: { tab: TripTab; page?: number; size?: number }) =>
     api<TripPage>('/api/brokers/me/trips', { query: params }),
   get: (tripId: number) => api<Trip>(`/api/brokers/me/trips/${tripId}`),
+  receiptPhoto: (photo: ReceiptPhoto) => apiBlob(photo.path),
 }
 
-/** 공개 페이지(인수증·대기 증빙)는 서버가 정적 HTML로 준다 */
+/** 공개 페이지(대기 증빙)는 서버가 정적 HTML로 준다 */
 export function publicPageUrl(path: string) {
   const base = (import.meta.env.VITE_API_BASE as string | undefined) ?? 'http://localhost:8080'
   return new URL(path, base).toString()

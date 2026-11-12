@@ -7,7 +7,7 @@ export type Tonnage = 'TON_1' | 'TON_1_4' | 'TON_2_5' | 'TON_3_5' | 'TON_5' | 'T
 export type BodyType = 'CARGO' | 'WING' | 'BOX' | 'REFRIGERATED' | 'LIFT' | 'ETC'
 export type LoadingMethod = 'FORKLIFT' | 'MANUAL'
 export type PaymentType = 'PREPAID' | 'COLLECT' | 'RECEIPT'
-export type CargoCategory = 'GENERAL' | 'COLD' | 'MOVING' | 'HAZARDOUS'
+export type CargoCategory = 'GENERAL' | 'COLD' | 'MOVING' | 'HAZARDOUS' | 'HEAVY' | 'LONG' | 'CONSTRUCTION' | 'FARM' | 'WASTE'
 export type ConsignmentType = 'DIRECT' | 'SUBCONTRACT'
 export type ConfirmMode = 'SELECT' | 'FIRST'
 export type OrderStatus = 'OPEN' | 'ASSIGNED' | 'CLOSED'
@@ -15,7 +15,6 @@ export type DispatchRequestStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'WITH
 export type CancelReason = 'VEHICLE_PROBLEM' | 'SCHEDULE_CONFLICT' | 'SHIPPER_CANCELED' | 'CONDITION_CHANGED' | 'OTHER'
 export type TripStatus = 'SCHEDULED' | 'TO_PICKUP' | 'AT_PICKUP' | 'IN_TRANSIT' | 'AT_DROPOFF' | 'COMPLETED' | 'CANCELLED'
 export type WaitStatus = 'WAITING' | 'WORKING' | 'DONE'
-export type DeliveryProofStatus = 'PENDING' | 'SIGNED' | 'PHOTO' | 'DELIVERED'
 export type WaitRounding = 'UP' | 'DOWN'
 
 /** 등록 폼의 선택지. 표기는 서버 enum의 label과 같게 */
@@ -54,6 +53,11 @@ export const CARGO_CATEGORIES: { value: CargoCategory; label: string }[] = [
   { value: 'COLD', label: '냉동·냉장' },
   { value: 'MOVING', label: '이사' },
   { value: 'HAZARDOUS', label: '위험물' },
+  { value: 'HEAVY', label: '중량물' },
+  { value: 'LONG', label: '장척물' },
+  { value: 'CONSTRUCTION', label: '건자재' },
+  { value: 'FARM', label: '농수산물' },
+  { value: 'WASTE', label: '폐기물' },
 ]
 export const CANCEL_REASONS: { value: CancelReason; label: string }[] = [
   { value: 'SHIPPER_CANCELED', label: '화주가 취소함' },
@@ -86,11 +90,5 @@ export const TRIP_TONE: Record<TripStatus, 'blue' | 'yellow' | 'green' | 'red' |
   CANCELLED: 'red',
 }
 export const WAIT_STATUS: Record<WaitStatus, string> = { WAITING: '대기 중', WORKING: '작업 중', DONE: '이탈' }
-export const PROOF_STATUS: Record<DeliveryProofStatus, string> = {
-  PENDING: '서명 전',
-  SIGNED: '서명 완료',
-  PHOTO: '종이 인수증 사진',
-  DELIVERED: '전달 완료',
-}
 export const CONSIGNMENT: Record<ConsignmentType, string> = { DIRECT: '직접 운송', SUBCONTRACT: '재위탁' }
 export const CONFIRM_MODE: Record<ConfirmMode, string> = { SELECT: '요청 중 골라서 확정', FIRST: '먼저 요청한 차주 자동 확정' }
