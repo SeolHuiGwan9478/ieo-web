@@ -5,7 +5,7 @@ import { adminApi, type AdminMe } from '../api/admin'
 import { Icon } from '../components/ui'
 import { AccountMenu } from '../layout/AccountMenu'
 
-/** 운영자 페이지 틀. 주선사 콘솔과 같은 생김새지만 메뉴는 차주·주선사 서류 심사뿐이다 */
+/** 운영자 페이지 틀. 주선사 콘솔과 같은 생김새지만 메뉴는 차주·주선사 서류 심사와 재위탁 의심 오더다 */
 export function AdminLayout({ me, onLogout, children }: { me: AdminMe; onLogout: () => void; children: ReactNode }) {
   // 심사 대기 차주·주선사 수. 목록 API가 탭과 상관없이 돌려준다. 승인·반려하면 화면이 ['admin'] 캐시를 통째로 새로 고친다
   const driverBadge = useQuery({
@@ -21,6 +21,8 @@ export function AdminLayout({ me, onLogout, children }: { me: AdminMe; onLogout:
   const menu = [
     { to: '/admin/reviews', icon: 'drivers', label: '차주 서류 심사', pending: driverBadge.data?.pendingDrivers ?? 0 },
     { to: '/admin/brokers', icon: 'members', label: '주선사 서류 심사', pending: brokerBadge.data?.pendingBrokers ?? 0 },
+    // 재위탁 의심은 처리 상태가 없어 숫자를 달지 않는다 (확인 뒤 제한 DSP-043은 아직 없다)
+    { to: '/admin/suspected-orders', icon: 'alert', label: '재위탁 의심', pending: 0 },
   ]
   return (
     <div className="flex min-h-screen">

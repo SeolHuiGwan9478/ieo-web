@@ -19,6 +19,7 @@ import { REVIEW_KINDS } from './admin/reviewKinds'
 import { AdminLoginPage } from './pages/admin/AdminLoginPage'
 import { AdminReviewsPage } from './pages/admin/AdminReviewsPage'
 import { AdminReviewDetailPage } from './pages/admin/AdminReviewDetailPage'
+import { AdminSuspectedOrdersPage } from './pages/admin/AdminSuspectedOrdersPage'
 
 /** 로그인 안 했으면 로그인으로, 소속 회사가 없으면 회사 등록으로 */
 function RequireCompany() {
@@ -95,6 +96,7 @@ export default function App() {
         <Route path="drivers/:id" element={<AdminReviewDetailPage config={REVIEW_KINDS.driver} />} />
         <Route path="brokers" element={<AdminReviewsPage config={REVIEW_KINDS.broker} />} />
         <Route path="brokers/:id" element={<AdminReviewDetailPage config={REVIEW_KINDS.broker} />} />
+        <Route path="suspected-orders" element={<AdminSuspectedOrdersPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

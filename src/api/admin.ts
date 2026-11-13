@@ -1,4 +1,5 @@
 import { api, apiBlob } from './client'
+import type { OrderStatus } from './types'
 
 /**
  * 운영자 서류 심사 (docs/design/07_운영자_서류심사_인계.md 7장·13장). /api/admin/** 은 운영자(ADMIN) 계정만 통과한다.
@@ -170,6 +171,31 @@ export interface BrokerReview extends ReviewDetailBase {
   }
 }
 
+/**
+ * 재위탁 의심 오더 한 줄 (DSP-041, 03 어드민 인계 4-1). 다른 주선사가 먼저 올린 모집 중 오더와 상하차지(각 500m 안)·상차 시간대가 겹친 오더다.
+ * source* 는 먼저 올라온 오더. 서버가 오래된 빌드면 source 쪽 상세가 안 올 수 있어 선택 값으로 둔다
+ */
+export interface SuspectedOrder {
+  orderId: number
+  brokerName: string
+  sourceOrderId: number
+  sourceBrokerName: string | null
+  pickupAddress: string
+  dropoffAddress: string
+  pickupFrom: string
+  fare: number
+  createdAt: string
+  status?: OrderStatus
+  cargoType?: string | null
+  sourcePickupAddress?: string | null
+  sourceDropoffAddress?: string | null
+  sourcePickupFrom?: string | null
+  sourceFare?: number | null
+  sourceCreatedAt?: string | null
+  sourceStatus?: OrderStatus | null
+  sourceCargoType?: string | null
+}
+
 export interface AdminMe {
   id: number
   phone: string | null
@@ -188,6 +214,9 @@ export type ReviewListParams = {
 
 export const adminApi = {
   me: () => api<AdminMe>('/api/users/me'),
+
+  /** 재위탁 의심 오더. 최근 등록 순. 서버가 전체 건수를 주지 않아 한 번에 100건까지만 받는다 */
+  suspectedOrders: () => api<SuspectedOrder[]>('/api/admin/suspected-orders', { query: { page: 0, size: 100 } }),
 
   /** 차주 서류 심사 */
   reviews: (params: ReviewListParams) => api<DriverReviewList>('/api/admin/driver-documents', { query: params }),
