@@ -33,8 +33,8 @@ export interface LandingCopy {
 }
 
 // 기능·주선사 메뉴가 가리킬 섹션은 아직 일부만 있다. 섹션을 만들면 같은 id를 붙인다.
-// 플랜은 데모다. Pro·Pro+의 가격과 기능은 ieo-app/docs/requirements/12_요금제_결제.md의 가정값이고,
-// Basic(유료)은 그 문서에 없어 임시로 채운 것이다.
+// 요금표는 기사님 플랜이다. 가격과 한도는 서버 DriverPlan과 같게 둔다 (베이직 무료, 프로 30일 30,000원. 12장 요금제).
+// 결제는 아직 시연용이다
 // 푸터의 회사·약관 링크는 아직 연결된 페이지가 없다
 export const LANDING_COPY: Record<Lang, LandingCopy> = {
   ko: {
@@ -81,7 +81,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { route: '인천 남동 → 부산 강서', driver: '박○○ · 11톤 카고' },
       ],
       brokerAction: '확정',
-      ribbon: { title: '배차부터 장부까지 한 앱에서', body: '배차 요청, 대기 타이머, QR 인수증, 음성 안내, 장부가 한 흐름으로 이어져요.' },
+      ribbon: { title: '배차부터 장부까지 한 앱에서', body: '배차 요청, 대기 타이머, 인수증 사진, 음성 안내, 장부가 한 흐름으로 이어져요.' },
       motion: { title: '운행에서 다음 운행으로', body: '운행이 끝나갈 때 하차지 근처의 다음 오더를 미리 추천해요.' },
     },
     intro: {
@@ -105,14 +105,12 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
     pricing: {
       title: '필요한 만큼만 쓰세요',
       subtitle: '오더 보기와 배차는 모든 플랜에서 무료예요. 돈과 직결되는 기능만 골라 쓰면 돼요.',
-      period: '/ 월',
+      period: '/ 30일',
       recommended: '추천',
       note: '가격은 부가세 포함 예시이고, 출시 때 달라질 수 있어요.',
       plans: [
-        { name: 'Free', tagline: '오더 보기와 배차는 계속 무료', price: '0원', features: ['오더 보기·배차 요청', '다음 배차 추천', '대기 시간 자동 기록', '인수증 사진 보내기', '이번 달 장부'] },
-        { name: 'Basic', tagline: '장부를 제대로 쓰고 싶을 때', price: '4,900원', features: ['Free의 모든 기능', '전체 기간 장부', '장부 엑셀 내보내기', '미수금 알림'] },
-        { name: 'Pro', tagline: '증빙과 세금계산서까지', price: '9,900원', recommended: true, features: ['Basic의 모든 기능', '대기 증빙 PDF·주선사 전송', '전자세금계산서 월 30건', '추천 고급 필터 (귀가 방향, 최소 실수익)', '월별·주선사별 분석'] },
-        { name: 'Pro+', tagline: '차량이 여러 대이거나 세무까지', price: '19,900원', features: ['Pro의 모든 기능', '전자세금계산서 월 100건', '세무 신고 연계', '운임 선지급·보험 제휴 할인', '차량 5대 등록'] },
+        { name: '베이직', tagline: '오더 보기와 배차는 계속 무료', price: '0원', features: ['오더 보기·배차 요청', '다음 배차 추천', '대기 시간 자동 기록', '인수증 사진 보내기', '이번 달 장부', '대기 증빙 보내기 30일 3건', '세금계산서 월 10장'] },
+        { name: '프로', tagline: '증빙과 장부를 넉넉하게', price: '30,000원', recommended: true, features: ['베이직의 모든 기능', '대기 증빙 보내기 무제한', '전체 기간 장부', '장부 내보내기', '세금계산서 월 40장', '첫 30일 무료 체험'] },
       ],
     },
     closing: { tagline: '끝나는 곳에서, 다음이 이어집니다' },
@@ -171,7 +169,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { route: 'Incheon → Busan', driver: 'Park · 11t cargo' },
       ],
       brokerAction: 'Confirm',
-      ribbon: { title: 'From dispatch to ledger in one app', body: 'Dispatch requests, the waiting timer, QR receipts, voice guidance and the ledger follow one flow.' },
+      ribbon: { title: 'From dispatch to ledger in one app', body: 'Dispatch requests, the waiting timer, receipt photos, voice guidance and the ledger follow one flow.' },
       motion: { title: 'From one haul to the next', body: 'As a trip winds down, Ieo recommends the next order around your drop-off ahead of time.' },
     },
     intro: {
@@ -195,14 +193,12 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
     pricing: {
       title: 'Pay only for what you need',
       subtitle: 'Browsing orders and getting dispatched is free on every plan. Pay only for the features tied to your money.',
-      period: '/ month',
+      period: '/ 30 days',
       recommended: 'Recommended',
       note: 'Prices are examples including VAT and may change at launch.',
       plans: [
-        { name: 'Free', tagline: 'Orders and dispatch stay free', price: '₩0', features: ['Browse orders and request dispatch', 'Next-load recommendations', 'Automatic waiting-time log', 'Receipt photos', "This month's ledger"] },
-        { name: 'Basic', tagline: 'When you want a proper ledger', price: '₩4,900', features: ['Everything in Free', 'Full ledger history', 'Export ledger to Excel', 'Overdue payment alerts'] },
-        { name: 'Pro', tagline: 'Proof and tax invoices included', price: '₩9,900', recommended: true, features: ['Everything in Basic', 'Waiting-proof PDF sent to brokers', '30 e-tax invoices a month', 'Advanced filters (way home, minimum net)', 'Monthly and per-broker analysis'] },
-        { name: 'Pro+', tagline: 'For several trucks, or tax filing too', price: '₩19,900', features: ['Everything in Pro', '100 e-tax invoices a month', 'Tax filing support', 'Early payment and insurance discounts', 'Register up to 5 vehicles'] },
+        { name: 'Basic', tagline: 'Orders and dispatch stay free', price: '₩0', features: ['Browse orders and request dispatch', 'Next-load recommendations', 'Automatic waiting-time log', 'Receipt photos', "This month's ledger", '3 waiting proofs per 30 days', '10 tax invoices a month'] },
+        { name: 'Pro', tagline: 'Plenty of room for proof and your ledger', price: '₩30,000', recommended: true, features: ['Everything in Basic', 'Unlimited waiting proofs', 'Full ledger history', 'Ledger export', '40 tax invoices a month', 'First 30 days free'] },
       ],
     },
     closing: { tagline: 'Where one haul ends, the next begins' },

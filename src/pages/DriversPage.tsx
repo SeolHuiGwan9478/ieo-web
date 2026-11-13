@@ -3,20 +3,20 @@ import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { driversApi } from '../api/people'
 import { ApiError } from '../api/client'
-import { useAuth } from '../auth/AuthContext'
 import { Button, Card, ErrorText, Field, Modal, PageHeader, ListTable, Tabs, Tag } from '../components/ui'
 import { formatDateTime, formatPhone } from '../lib/format'
 
-/** 단골 차주 (BRK-002): 번호로 연결 요청 → 차주가 차량 앱에서 수락 → 위치 공유·지정 배차 */
+/**
+ * 단골 차주 (BRK-002): 번호로 연결 요청 → 차주가 차량 앱에서 수락 → 위치 공유·지정 배차.
+ * 매일 하는 일이라 대표가 아닌 담당자도 요청·해제·취소를 할 수 있다 (서버도 직책을 가리지 않는다)
+ */
 export function DriversPage() {
-  const { me } = useAuth()
   const queryClient = useQueryClient()
   const [inviteOpen, setInviteOpen] = useState(false)
   const [tab, setTab] = useState<'linked' | 'pending'>('linked')
   const [error, setError] = useState<string | null>(null)
   const drivers = useQuery({ queryKey: ['drivers'], queryFn: driversApi.list })
   const invitations = useQuery({ queryKey: ['driver-invitations'], queryFn: driversApi.invitations })
-  const isOwner = me?.position === 'OWNER'
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['drivers'] })
@@ -35,7 +35,7 @@ export function DriversPage() {
       <PageHeader
         title="단골 차주"
         description="단골 차주는 운행 중 위치가 보이고, 지정 배차를 받을 수 있어요."
-        action={isOwner ? <Button onClick={() => setInviteOpen(true)}>번호로 연결 요청</Button> : null}
+        action={<Button onClick={() => setInviteOpen(true)}>번호로 연결 요청</Button>}
       />
       <Tabs
         value={tab}
@@ -53,20 +53,37 @@ export function DriversPage() {
             rowKey={(d) => d.linkId}
             empty="아직 연결된 차주가 없어요. 자주 일하는 차주의 번호로 연결을 요청해 보세요."
             columns={[
-              { key: 'name', header: '차주', cell: (d) => <span className="font-semibold">{d.name}</span> },
+              {
+                key: 'name',
+                header: '차주',
+                cell: (d) => (
+                  <span className="flex items-center gap-1.5">
+                    <span className="font-semibold">{d.name}</span>
+                    {d.verified ? <Tag tone="orange">인증 차주</Tag> : null}
+                  </span>
+                ),
+              },
               { key: 'phone', header: '연락처', cell: (d) => <a href={`tel:${d.phone}`} className="tabular-nums hover:text-orange-700">{formatPhone(d.phone)}</a> },
               { key: 'vehicle', header: '차량', cell: (d) => (d.plateNumber ? `${d.plateNumber} · ${d.tonnageLabel} ${d.bodyTypeLabel}` : <span className="text-ink-sub">차량 없음</span>) },
+              {
+                key: 'record',
+                header: '이행 기록',
+                cell: (d) => (
+                  <span className="text-[13px]">
+                    완료 {d.completedTripCount}건{d.lateCancelCount > 0 ? <span className="text-status-red"> · 늦은 취소 {d.lateCancelCount}</span> : null}
+                  </span>
+                ),
+              },
               { key: 'since', header: '연결', cell: (d) => <span className="text-[13px] text-ink-mid">{formatDateTime(d.linkedAt)}</span> },
               {
                 key: 'action',
                 header: '',
                 align: 'right',
-                cell: (d) =>
-                  isOwner ? (
-                    <Button variant="ghost" size="sm" onClick={() => window.confirm(`${d.name} 차주와의 연결을 해제할까요? 진행 중인 운행은 그대로예요.`) && unlink.mutate(d.linkId)}>
-                      해제
-                    </Button>
-                  ) : null,
+                cell: (d) => (
+                  <Button variant="ghost" size="sm" onClick={() => window.confirm(`${d.name} 차주와의 연결을 해제할까요? 진행 중인 운행은 그대로예요.`) && unlink.mutate(d.linkId)}>
+                    해제
+                  </Button>
+                ),
               },
             ]}
           />
@@ -80,7 +97,7 @@ export function DriversPage() {
               { key: 'status', header: '상태', cell: (i) => <Tag tone="blue">{i.statusLabel}</Tag> },
               { key: 'by', header: '요청한 사람', cell: (i) => i.invitedByName },
               { key: 'until', header: '기한', cell: (i) => <span className="text-[13px] text-ink-mid">{formatDateTime(i.expiresAt)}까지</span> },
-              { key: 'action', header: '', align: 'right', cell: (i) => (isOwner ? <Button variant="ghost" size="sm" onClick={() => cancel.mutate(i.id)}>취소</Button> : null) },
+              { key: 'action', header: '', align: 'right', cell: (i) => <Button variant="ghost" size="sm" onClick={() => cancel.mutate(i.id)}>취소</Button> },
             ]}
           />
         )}

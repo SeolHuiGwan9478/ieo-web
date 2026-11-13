@@ -6,7 +6,7 @@ export interface Plan {
   name: string
   /** 한 줄 설명 */
   tagline: string
-  /** 월 요금 표시 (예: 9,900원). 무료는 "0원" */
+  /** 30일 요금 표시 (예: 30,000원). 무료는 "0원" */
   price: string
   /** 이 플랜에서 되는 것. 첫 줄에 "○○의 모든 기능"을 두면 위 플랜과 이어진다 */
   features: string[]
@@ -14,10 +14,10 @@ export interface Plan {
   recommended?: boolean
 }
 
-/** 요금제 카드 줄. 넓은 화면은 4칸, 태블릿은 2칸, 폰은 1칸 */
+/** 요금제 카드 줄. 플랜이 둘 이하면 가운데에 2칸, 더 많으면 넓은 화면 4칸·태블릿 2칸. 폰은 1칸 */
 export function PricingPlans({ plans, period, recommendedLabel }: { plans: Plan[]; period: string; recommendedLabel: string }) {
   return (
-    <ul className="grid gap-4 text-left sm:grid-cols-2 lg:grid-cols-4">
+    <ul className={cn('grid gap-4 text-left sm:grid-cols-2', plans.length > 2 ? 'lg:grid-cols-4' : 'mx-auto max-w-3xl')}>
       {plans.map((plan, i) => (
         <li key={plan.name}>
           <Reveal delayMs={i * 80} className="h-full">

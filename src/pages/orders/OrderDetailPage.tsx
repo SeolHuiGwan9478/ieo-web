@@ -196,7 +196,10 @@ function applicantColumns(action: (a: Applicant) => React.ReactNode) {
       header: '차주',
       cell: (a: Applicant) => (
         <div>
-          <p className="font-semibold">{a.driverName}</p>
+          <p className="flex items-center gap-1.5 font-semibold">
+            {a.driverName}
+            {a.verified ? <Tag tone="orange">인증 차주</Tag> : null}
+          </p>
           <p className="text-[12.5px] text-ink-sub">
             {a.plateNumber} · {a.tonnageLabel} {a.bodyTypeLabel}
           </p>

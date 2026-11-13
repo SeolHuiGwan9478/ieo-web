@@ -22,7 +22,7 @@ export function TripsPage() {
 
   return (
     <>
-      <PageHeader title="진행 중 운행" description="위치와 도착 예정은 단골 차주만 보여요." />
+      <PageHeader title="진행 중 운행" description="위치는 단골 차주만, 도착 예정은 기사님이 공유에 동의했으면 보여요." />
       <Tabs<TripTab>
         value={tab}
         onChange={(v) => {

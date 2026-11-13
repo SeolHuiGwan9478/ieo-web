@@ -46,6 +46,11 @@ export interface LinkedDriver {
   bodyType: BodyType | null
   bodyTypeLabel: string | null
   linkedAt: string
+  /** 필수 서류가 모두 승인된 인증 차주 (07 인계서 14장) */
+  verified: boolean
+  /** 이에오에서 완료한 운행 수, 상차 2시간 안에 차주가 취소한 수 (DSP-031) */
+  completedTripCount: number
+  lateCancelCount: number
 }
 
 export interface SentDriverInvitation {

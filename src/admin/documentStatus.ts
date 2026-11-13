@@ -14,9 +14,10 @@ export const REVIEW_TABS: { value: ReviewFilter; label: string }[] = [
   { value: 'ALL', label: '전체' },
 ]
 
-/** 국세청 조회 결과 꼬리표 (목록·상세). 조회 안 함(SKIPPED)은 표시하지 않는다 */
+/** 국세청 조회 결과 꼬리표 (목록·상세). 키가 없어 조회하지 않은 서류(SKIPPED)는 운영자가 눈으로 봐야 하므로 회색으로 알린다 */
 export function businessCheckTag(result: BusinessCheckResult | null | undefined, status: BusinessStatus | null | undefined): { label: string; tone: Tone } | null {
-  if (!result || result === 'SKIPPED') return null
+  if (!result) return null
+  if (result === 'SKIPPED') return { label: '국세청 조회 안 함', tone: 'gray' }
   if (result === 'MISMATCH') return { label: '국세청 불일치', tone: 'red' }
   if (result === 'ERROR') return { label: '국세청 조회 실패', tone: 'gray' }
   if (status === 'CLOSED') return { label: '폐업 사업자', tone: 'red' }

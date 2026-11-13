@@ -85,6 +85,8 @@ export interface Applicant {
   tonnageLabel: string
   bodyType: BodyType
   bodyTypeLabel: string
+  /** 필수 서류가 모두 승인된 인증 차주 (07 인계서 14장) */
+  verified: boolean
   completedTripCount: number
   lateCancelCount: number
   requestedAt: string
