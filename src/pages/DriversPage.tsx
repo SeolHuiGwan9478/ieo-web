@@ -103,7 +103,7 @@ export function DriversPage() {
         )}
       </Card>
       <p className="mt-3 text-[12.5px] text-ink-sub">
-        차주는 차량 앱(정차 중)에서 요청을 수락해요. 가입 전 번호도 요청할 수 있어요. 문자 발송은 아직 없어서 요청한 사실을 따로 알려 주세요.
+        차주는 차량 앱(정차 중)에서 요청을 수락해요. 가입 전 번호도 요청할 수 있어요. 문자는 보내지 않으니 요청한 사실을 따로 알려 주세요.
       </p>
       <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={refresh} />
     </>

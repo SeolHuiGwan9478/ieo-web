@@ -109,7 +109,7 @@ export function MembersPage() {
             나가기
           </Button>
         </div>
-        <p className="text-[12.5px] text-ink-sub">초대받은 번호로 콘솔에 로그인하면 초대가 보여요. 문자 발송은 아직 없어서 따로 알려 주세요.</p>
+        <p className="text-[12.5px] text-ink-sub">초대받은 번호로 콘솔에 로그인하면 초대가 보여요. 문자는 보내지 않으니 따로 알려 주세요.</p>
       </div>
       <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={refresh} />
     </>
