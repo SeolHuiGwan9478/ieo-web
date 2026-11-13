@@ -12,7 +12,7 @@ const INTERVAL_MS = 4200
 
 export function LoginShowcase() {
   const [scene, setScene] = useState(0)
-  // 한 장면 안에서 일어나는 동작(확정, 진행, 서명)의 단계
+  // 한 장면 안에서 일어나는 동작(확정, 진행, 사진 도착)의 단계
   const [tick, setTick] = useState(0)
 
   useEffect(() => {

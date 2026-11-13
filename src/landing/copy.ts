@@ -109,7 +109,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       recommended: '추천',
       note: '가격은 부가세 포함 예시이고, 출시 때 달라질 수 있어요.',
       plans: [
-        { name: 'Free', tagline: '오더 보기와 배차는 계속 무료', price: '0원', features: ['오더 보기·배차 요청', '다음 배차 추천', '대기 시간 자동 기록', '전자인수증', '이번 달 장부'] },
+        { name: 'Free', tagline: '오더 보기와 배차는 계속 무료', price: '0원', features: ['오더 보기·배차 요청', '다음 배차 추천', '대기 시간 자동 기록', '인수증 사진 보내기', '이번 달 장부'] },
         { name: 'Basic', tagline: '장부를 제대로 쓰고 싶을 때', price: '4,900원', features: ['Free의 모든 기능', '전체 기간 장부', '장부 엑셀 내보내기', '미수금 알림'] },
         { name: 'Pro', tagline: '증빙과 세금계산서까지', price: '9,900원', recommended: true, features: ['Basic의 모든 기능', '대기 증빙 PDF·주선사 전송', '전자세금계산서 월 30건', '추천 고급 필터 (귀가 방향, 최소 실수익)', '월별·주선사별 분석'] },
         { name: 'Pro+', tagline: '차량이 여러 대이거나 세무까지', price: '19,900원', features: ['Pro의 모든 기능', '전자세금계산서 월 100건', '세무 신고 연계', '운임 선지급·보험 제휴 할인', '차량 5대 등록'] },
@@ -199,7 +199,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       recommended: 'Recommended',
       note: 'Prices are examples including VAT and may change at launch.',
       plans: [
-        { name: 'Free', tagline: 'Orders and dispatch stay free', price: '₩0', features: ['Browse orders and request dispatch', 'Next-load recommendations', 'Automatic waiting-time log', 'Digital receipts', "This month's ledger"] },
+        { name: 'Free', tagline: 'Orders and dispatch stay free', price: '₩0', features: ['Browse orders and request dispatch', 'Next-load recommendations', 'Automatic waiting-time log', 'Receipt photos', "This month's ledger"] },
         { name: 'Basic', tagline: 'When you want a proper ledger', price: '₩4,900', features: ['Everything in Free', 'Full ledger history', 'Export ledger to Excel', 'Overdue payment alerts'] },
         { name: 'Pro', tagline: 'Proof and tax invoices included', price: '₩9,900', recommended: true, features: ['Everything in Basic', 'Waiting-proof PDF sent to brokers', '30 e-tax invoices a month', 'Advanced filters (way home, minimum net)', 'Monthly and per-broker analysis'] },
         { name: 'Pro+', tagline: 'For several trucks, or tax filing too', price: '₩19,900', features: ['Everything in Pro', '100 e-tax invoices a month', 'Tax filing support', 'Early payment and insurance discounts', 'Register up to 5 vehicles'] },
