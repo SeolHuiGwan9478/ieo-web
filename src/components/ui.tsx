@@ -31,7 +31,7 @@ export function Card({ children, className = '', title, count, action, padded = 
 
 export function PageHeader({ title, description, action, back }: { title: ReactNode; description?: ReactNode; action?: ReactNode; back?: { to: string; label: string } }) {
   return (
-    <div className="mb-5 flex items-end justify-between gap-4">
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
       <div className="min-w-0">
         {back ? (
           <Link to={back.to} className="mb-1 inline-flex items-center gap-1 text-[13px] text-ink-sub hover:text-ink-mid">
@@ -322,7 +322,7 @@ export function Table<T>({ columns, rows, rowKey, onRowClick, empty }: {
         <thead>
           <tr className="border-b border-line text-left text-[12.5px] text-ink-sub">
             {columns.map((c) => (
-              <th key={c.key} className={`sticky top-0 z-[1] bg-white px-4 py-2 font-medium shadow-[inset_0_-1px_0_var(--color-line)] ${c.align === 'right' ? 'text-right' : ''}`} style={{ width: c.width }}>
+              <th key={c.key} className={`sticky top-0 z-[1] whitespace-nowrap bg-white px-4 py-2 font-medium shadow-[inset_0_-1px_0_var(--color-line)] ${c.align === 'right' ? 'text-right' : ''}`} style={{ width: c.width }}>
                 {c.header}
               </th>
             ))}
@@ -336,7 +336,7 @@ export function Table<T>({ columns, rows, rowKey, onRowClick, empty }: {
               className={`border-b border-line/70 last:border-0 ${onRowClick ? 'cursor-pointer hover:bg-canvas/70' : ''}`}
             >
               {columns.map((c) => (
-                <td key={c.key} className={`px-4 py-2.5 align-middle ${c.align === 'right' ? 'text-right tabular-nums' : ''}`}>
+                <td key={c.key} className={`whitespace-nowrap px-4 py-2.5 align-middle ${c.align === 'right' ? 'text-right tabular-nums' : ''}`}>
                   {c.cell(row)}
                 </td>
               ))}
@@ -469,6 +469,7 @@ const ICONS: Record<string, ReactNode> = {
   plus: <path d="M12 5v14M5 12h14" />,
   back: <path d="m15 18-6-6 6-6" />,
   close: <path d="M18 6 6 18M6 6l12 12" />,
+  menu: <path d="M4 6h16M4 12h16M4 18h16" />,
   alert: <><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></>,
   inbox: <><path d="M3 13h5l2 3h4l2-3h5" /><path d="M5 4h14l2 9v7H3v-7z" /></>,
   lock: <><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></>,
