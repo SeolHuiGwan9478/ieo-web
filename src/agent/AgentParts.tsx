@@ -122,10 +122,10 @@ export function WebSearchCard({ part }: { part: WebSearchPart }) {
           {part.sources.map((source, i) => (
             <li key={source.url}>
               <a href={source.url} target="_blank" rel="noreferrer" className="block h-full rounded-lg bg-canvas p-2.5 hover:bg-orange-50">
-                <span className="flex items-center gap-1.5 text-[11.5px] text-ink-sub">
-                  <span className="flex h-4 w-4 items-center justify-center rounded bg-white text-[10px] font-bold text-ink-mid">{i + 1}</span>
-                  {source.site}
-                  {source.date ? <span>· {source.date}</span> : null}
+                <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[11.5px] text-ink-sub">
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-white text-[10px] font-bold text-ink-mid">{i + 1}</span>
+                  <span className="truncate">{source.site}</span>
+                  {source.date ? <span className="shrink-0">· {source.date}</span> : null}
                 </span>
                 <span className="mt-1 block text-[13px] font-semibold leading-snug text-ink-strong">{source.title}</span>
                 <span className="mt-0.5 line-clamp-2 block text-[12px] text-ink-mid">{source.snippet}</span>
