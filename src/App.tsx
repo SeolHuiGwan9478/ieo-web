@@ -13,6 +13,7 @@ import { TripDetailPage } from './pages/trips/TripDetailPage'
 import { DriversPage } from './pages/DriversPage'
 import { MembersPage } from './pages/MembersPage'
 import { ReportsPage } from './pages/ReportsPage'
+import { AgentPage } from './pages/AgentPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { RequireAdmin } from './admin/RequireAdmin'
 import { REVIEW_KINDS } from './admin/reviewKinds'
@@ -86,6 +87,7 @@ export default function App() {
         <Route path="/drivers" element={<DriversPage />} />
         <Route path="/members" element={<MembersPage />} />
         <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/agent" element={<AgentPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
       {/* 이에오 운영자 페이지. 주선사 콘솔과 로그인·토큰이 따로다 (07 운영자 서류심사 인계). 차주 심사와 주선사 심사는 같은 페이지에 설정만 다르다 */}

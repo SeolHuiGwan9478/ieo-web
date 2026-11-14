@@ -5,13 +5,15 @@ import { Icon } from '../components/ui'
 import { AccountMenu } from './AccountMenu'
 
 /** 왼쪽 메뉴 + 본문. 선택된 메뉴만 주황. 설정(구독 플랜은 그 안의 탭)·로그아웃은 맨 아래 계정 단추(AccountMenu)에 모았다 */
-const MENU: { to: string; label: string; icon: string; end?: boolean }[] = [
+const MENU: { to: string; label: string; icon: string; end?: boolean; badge?: string }[] = [
   { to: '/', label: '내 회사', icon: 'home', end: true },
   { to: '/orders', label: '오더', icon: 'orders' },
   { to: '/trips', label: '진행 중 운행', icon: 'truck' },
   { to: '/drivers', label: '단골 차주', icon: 'drivers' },
   { to: '/members', label: '담당자', icon: 'members' },
   { to: '/reports', label: '리포트', icon: 'chart' },
+  // 에이전트는 프로 기능 (2026-11-14 시연). 베이직이면 페이지에서 플랜 안내를 보여 준다
+  { to: '/agent', label: '에이전트', icon: 'agent', badge: 'PRO' },
 ]
 
 export function AppLayout({ children }: { children: ReactNode }) {
@@ -37,6 +39,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             >
               <Icon name={item.icon} className="h-[18px] w-[18px]" />
               {item.label}
+              {item.badge ? <span className="ml-auto rounded-md bg-orange-100 px-1.5 py-px text-[10.5px] font-extrabold text-orange-700">{item.badge}</span> : null}
             </NavLink>
           ))}
         </nav>

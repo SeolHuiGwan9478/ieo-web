@@ -70,3 +70,9 @@ html {
   background: var(--color-canvas);
   color: var(--color-ink-strong);
 }
+
+/* 에이전트 이미지 생성 중 (2026-11-14) */
+@keyframes agent-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
