@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
-import { ordersApi, type Applicant } from '../../api/orders'
+import { ordersApi, type Applicant, type Order } from '../../api/orders'
 import { ApiError } from '../../api/client'
 import type { CancelReason } from '../../api/types'
 import { CANCEL_REASONS, CONFIRM_MODE, CONSIGNMENT, ORDER_STATUS, REQUEST_STATUS } from '../../api/types'
@@ -49,7 +49,7 @@ export function OrderDetailPage() {
           <span className="flex items-center gap-3">
             {o.pickup.name} <span className="text-ink-sub">→</span> {o.dropoff.name}
             <Tag tone={ORDER_STATUS[o.status].tone} dot>
-              {o.status === 'CLOSED' && o.closeReason === 'EXPIRED' ? '상차 시간 지남' : ORDER_STATUS[o.status].label}
+              {o.status === 'CLOSED' && o.closeReason === 'EXPIRED' ? '상차 시간 지남' : o.status === 'CLOSED' && o.closeReason === 'UNLINKED' ? '단골 해제' : ORDER_STATUS[o.status].label}
             </Tag>
           </span>
         }
@@ -102,14 +102,8 @@ export function OrderDetailPage() {
             </Card>
           ) : null}
           {o.status === 'CLOSED' ? (
-            <Card title={o.closeReason === 'EXPIRED' ? '상차 시간이 지나 마감됐어요' : o.closeReason === 'CANCELED' ? '배차가 취소되어 마감됐어요' : '내린 오더예요'}>
-              <p className="text-[14px] text-ink-mid">
-                {o.closeReason === 'EXPIRED'
-                  ? '상차 가능 시간이 끝날 때까지 배차되지 않아 자동으로 마감됐어요. 차주에게는 더 이상 보이지 않아요.'
-                  : o.closeReason === 'CANCELED'
-                    ? '확정됐던 배차를 취소하면서 오더도 내렸어요. 지난 요청은 아래에 남아 있어요.'
-                    : '마감된 오더는 다시 열 수 없어요. 같은 조건으로 다시 올리려면 "복사해서 올리기"를 눌러 주세요.'}
-              </p>
+            <Card title={closedNote(o.closeReason).title}>
+              <p className="text-[14px] text-ink-mid">{closedNote(o.closeReason).body}</p>
               <LinkButton to={`/orders/new?from=${o.id}`} variant="primary" className="mt-4">
                 같은 조건으로 다시 올리기
               </LinkButton>
@@ -248,4 +242,18 @@ function CancelModal({ open, onClose, loading, onSubmit }: { open: boolean; onCl
       </form>
     </Modal>
   )
+}
+
+/** 마감 이유별 안내. UNLINKED는 지정한 단골 차주와 연결이 해제되어 서버가 마감한 오더 (BRK-011) */
+function closedNote(reason: Order['closeReason']): { title: string; body: string } {
+  switch (reason) {
+    case 'EXPIRED':
+      return { title: '상차 시간이 지나 마감됐어요', body: '상차 가능 시간이 끝날 때까지 배차되지 않아 자동으로 마감됐어요. 차주에게는 더 이상 보이지 않아요.' }
+    case 'CANCELED':
+      return { title: '배차가 취소되어 마감됐어요', body: '확정됐던 배차를 취소하면서 오더도 내렸어요. 지난 요청은 아래에 남아 있어요.' }
+    case 'UNLINKED':
+      return { title: '단골 해제로 마감됐어요', body: '이 오더를 지정한 단골 차주와 연결이 해제되어 자동으로 마감됐어요. 다시 모집하려면 아래 버튼으로 같은 조건을 불러와 마켓에 공개하거나 다른 단골 차주를 정해 주세요.' }
+    default:
+      return { title: '내린 오더예요', body: '마감된 오더는 다시 열 수 없어요. 같은 조건으로 다시 올리려면 아래 버튼을 눌러 주세요.' }
+  }
 }

@@ -210,7 +210,7 @@ function MetricsTab() {
               <div className="rounded-xl bg-canvas p-5 text-[14px] text-ink-mid">
                 <p className="font-semibold text-ink-strong">아직 기록을 쌓는 중이에요</p>
                 <p className="mt-1">
-                  최근 180일 완료 운행이 <b>{m.minSampleCount}건</b>을 넘으면 공개돼요. 지금은 <b>{m.sampleCount}건</b>이에요. 그 전까지 차주에게는 "기록 쌓는 중"으로 보여요.
+                  최근 180일 완료 운행이 <b>{m.minSampleCount}건</b> 이상이면 공개돼요. 지금은 <b>{m.sampleCount}건</b>이에요. 그 전까지 차주에게는 "거래 기록 적음"으로 보여요.
                 </p>
               </div>
             )}

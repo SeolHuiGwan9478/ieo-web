@@ -7,7 +7,7 @@ import { Button, Card, ErrorText, Field, Modal, PageHeader, ListTable, Tabs, Tag
 import { formatDateTime, formatPhone } from '../lib/format'
 
 /**
- * 단골 차주 (BRK-002): 번호로 연결 요청 → 차주가 차량 앱에서 수락 → 위치 공유·지정 배차.
+ * 단골 차주 (BRK-002): 번호로 연결 요청 → 차주가 휴대폰 앱에서 수락 → 위치 공유·지정 배차.
  * 매일 하는 일이라 대표가 아닌 담당자도 요청·해제·취소를 할 수 있다 (서버도 직책을 가리지 않는다)
  */
 export function DriversPage() {
@@ -103,7 +103,7 @@ export function DriversPage() {
         )}
       </Card>
       <p className="mt-3 text-[12.5px] text-ink-sub">
-        차주는 차량 앱(정차 중)에서 요청을 수락해요. 가입 전 번호도 요청할 수 있어요. 문자는 보내지 않으니 요청한 사실을 따로 알려 주세요.
+        차주는 휴대폰 앱에서 요청을 수락하거나 거절해요. 이미 가입한 차주에게는 앱 알림이 가요. 가입 전 번호는 그 번호로 가입하면 요청이 보여요. 문자는 보내지 않으니 필요하면 따로 알려 주세요.
       </p>
       <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} onDone={refresh} />
     </>
@@ -134,7 +134,7 @@ function InviteModal({ open, onClose, onDone }: { open: boolean; onClose: () => 
           error={formState.errors.phone?.message}
           {...register('phone', { required: '번호를 입력해 주세요.', validate: (v) => /^01\d{8,9}$/.test(v.replace(/\D/g, '')) || '휴대폰 번호는 숫자만 입력해 주세요.' })}
         />
-        <p className="text-[13px] text-ink-sub">차주가 수락하면 우리 운행 중 위치와 도착 예정 시각이 공유돼요. 요청은 7일 동안 유효해요.</p>
+        <p className="text-[13px] text-ink-sub">차주가 수락하면 우리 운행 중 위치와 도착 예정 시각이 공유돼요. 요청은 7일 동안 유효해요. 가입한 차주에게는 앱 알림이 가요.</p>
         <ErrorText>{error}</ErrorText>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>

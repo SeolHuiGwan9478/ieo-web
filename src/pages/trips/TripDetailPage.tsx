@@ -2,7 +2,7 @@ import { TripMap } from '../../components/TripMap'
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { publicPageUrl, tripsApi, type Receipt, type TripStop } from '../../api/trips'
+import { publicPageUrl, tripsApi, type Receipt, type Trip, type TripStop } from '../../api/trips'
 import { ApiError } from '../../api/client'
 import { TRIP_TONE, WAIT_STATUS } from '../../api/types'
 import { Button, Card, DescList, ErrorText, Icon, Loading, Modal, PageHeader, Tag } from '../../components/ui'
@@ -68,7 +68,7 @@ export function TripDetailPage() {
                   ) : null}
                 </div>
               ) : (
-                <p className="text-[14px] text-ink-mid">{t.location ? '상하차지에 머물러 있거나 길 안내 중이 아니라 도착 예정 시각이 없어요.' : t.locationVisible ? '차량 앱이 아직 위치를 보내지 않았어요. 출발하면 5분마다 들어와요.' : '단골 차주가 아니라 위치는 보이지 않고, 상태와 도착 예정만 보여요.'}</p>
+                <p className="text-[14px] text-ink-mid">{noEtaNote(t)}</p>
               )}
               <TripMap key={t.id} trip={t} />
             </Card>
@@ -303,4 +303,16 @@ function ExternalLink({ href, children }: { href: string; children: React.ReactN
       {children} <Icon name="external" className="h-3.5 w-3.5" />
     </a>
   )
+}
+
+/**
+ * 도착 예정이 없을 때 이유 (BRK-002, ACC-006). 서버는 단골일 때만 위치를, 공유 동의가 켜져 있을 때만 도착 예정을 준다.
+ * 단골 + 동의 끔이면 locationVisible이 false다. 단골이 아니면 동의를 껐는지 길 안내 중이 아닌지는 알 수 없다
+ */
+function noEtaNote(t: Trip): string {
+  if (t.linkedDriver) {
+    if (!t.locationVisible) return '기사님이 위치 공유를 꺼 두었어요.'
+    return t.location ? '상하차지에 머물러 있거나 길 안내 중이 아니라 도착 예정 시각이 없어요.' : '차량 앱이 아직 위치를 보내지 않았어요. 출발하면 5분마다 들어와요.'
+  }
+  return '단골 차주가 아니라 위치는 보이지 않아요. 기사님이 공유를 꺼 두었거나 길 안내 중이 아니라 도착 예정도 없어요.'
 }

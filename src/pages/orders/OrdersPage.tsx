@@ -103,6 +103,8 @@ export function OrdersPage() {
                   cell: (o) =>
                     (o.status === 'OPEN' && !o.open) || o.closeReason === 'EXPIRED' ? (
                       <Tag tone="gray">상차 시간 지남</Tag>
+                    ) : o.closeReason === 'UNLINKED' ? (
+                      <Tag tone="gray">단골 해제</Tag>
                     ) : (
                       <Tag tone={ORDER_STATUS[o.status].tone} dot>{ORDER_STATUS[o.status].label}</Tag>
                     ),
