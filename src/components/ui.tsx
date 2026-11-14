@@ -81,7 +81,7 @@ const buttonLook: Record<ButtonVariant, string> = {
 export function Button({ variant = 'primary', size = 'md', loading, disabled, className = '', children, ...rest }: ButtonProps) {
   return (
     <button className={`${buttonBase} ${buttonDims[size]} ${buttonLook[variant]} ${className}`} disabled={disabled || loading} {...rest}>
-      {loading ? <Spinner /> : null}
+      {loading ? <IeoLoader width={28} /> : null}
       {children}
     </button>
   )
@@ -95,8 +95,26 @@ export function LinkButton({ to, children, variant = 'primary', size = 'md', cla
   )
 }
 
-export function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
-  return <span className={`inline-block animate-spin rounded-full border-2 border-current border-t-transparent ${className}`} />
+/**
+ * 로딩 표시 "이어 붙이기" (2026-11-14). 로고의 막대가 앞으로 늘어나 큰 점·작은 점을 이어 붙였다가 돌아온다.
+ * 차량 앱·휴대폰 앱(IeoLoading.kt)과 같은 숫자다: 1.8초, 막대 42 → 86, 점은 막대가 지나갈 때 사라진다.
+ * 색은 글자색(currentColor)을 따른다. 동작 줄이기 설정이면 멈춘 로고만 보인다
+ */
+export function IeoLoader({ width = 72, className = '' }: { width?: number; className?: string }) {
+  const still = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  return (
+    <svg role="img" aria-label="불러오는 중" viewBox="14 47 90 26" width={width} height={(width * 26) / 90} className={`inline-block shrink-0 ${className}`} fill="currentColor">
+      <rect x="18" y="51" width="42" height="18" rx="9">
+        {still ? null : <animate attributeName="width" dur="1.8s" repeatCount="indefinite" keyTimes="0;0.1;0.5;0.6;0.95;1" values="42;42;86;86;42;42" calcMode="spline" keySplines="0 0 1 1;.4 0 .2 1;0 0 1 1;.4 0 .2 1;0 0 1 1" />}
+      </rect>
+      <circle cx="76" cy="60" r="9">
+        {still ? null : <animate attributeName="opacity" dur="1.8s" repeatCount="indefinite" keyTimes="0;0.2;0.3;0.72;0.8;1" values="1;1;0;0;1;1" />}
+      </circle>
+      <circle cx="98" cy="60" r="6">
+        {still ? null : <animate attributeName="opacity" dur="1.8s" repeatCount="indefinite" keyTimes="0;0.38;0.46;0.6;0.7;1" values="1;1;0;0;1;1" />}
+      </circle>
+    </svg>
+  )
 }
 
 /* ───────── 입력 ───────── */
@@ -249,12 +267,11 @@ export function Empty({ children, action }: { children: ReactNode; action?: Reac
   )
 }
 
+/** 불러오는 동안 자리를 채우는 패널. rows는 나중에 들어올 줄 수라 그만큼 높이를 잡아 화면이 덜 흔들린다 */
 export function Loading({ rows = 3 }: { rows?: number }) {
   return (
-    <div className="space-y-2 p-5">
-      {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="h-9 animate-pulse rounded-lg bg-canvas" />
-      ))}
+    <div className="flex items-center justify-center p-5 text-orange-500" style={{ minHeight: rows * 44 + 40 }}>
+      <IeoLoader width={88} />
     </div>
   )
 }
