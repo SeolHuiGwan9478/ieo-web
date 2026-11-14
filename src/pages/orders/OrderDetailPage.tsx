@@ -219,7 +219,7 @@ function CancelModal({ open, onClose, loading, onSubmit }: { open: boolean; onCl
   return (
     <Modal open={open} onClose={onClose} title="배차 취소">
       <form onSubmit={handleSubmit((v) => onSubmit({ reason: v.reason, memo: v.memo.trim() || undefined, reopen: v.reopen === 'true' }))} className="space-y-4">
-        <p className="text-[14px] text-ink-mid">차주의 운행이 취소되고 취소 기록이 남아요. 상차 2시간 이내면 차주 이행 기록에는 남지 않아요 (주선사 취소).</p>
+        <p className="text-[14px] text-ink-mid">차주의 운행이 취소되고 취소 기록이 남아요. 상차 2시간 이내면 차주 이행 기록에는 남지 않아요 (주선사 취소). 이때 기사님에게 보상으로 프로 3일 쿠폰이 가요.</p>
         <p className="text-[13px] text-ink-sub">짐을 실은 뒤(운송 중·하차지)에는 기사님이 앱에서 취소할 수 없어서, 취소가 필요하면 기사님이 연락해 올 수 있어요.</p>
         <SelectField label="사유" options={CANCEL_REASONS} {...register('reason')} />
         <TextareaField label="메모 (선택)" placeholder="차주에게 보이지 않아요. 내부 기록용" maxLength={200} {...register('memo')} />

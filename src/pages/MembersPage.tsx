@@ -17,7 +17,6 @@ export function MembersPage() {
   const members = useQuery({ queryKey: ['members'], queryFn: membersApi.list })
   const invitations = useQuery({ queryKey: ['member-invitations'], queryFn: membersApi.invitations })
   const isOwner = me?.position === 'OWNER'
-  const limit = me?.plan.limits.members ?? null
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['members'] })
@@ -30,13 +29,11 @@ export function MembersPage() {
   const leave = useMutation({ mutationFn: membersApi.leave, onSuccess: logout, onError: fail })
 
   const pending = (invitations.data ?? []).filter((i) => i.status === 'PENDING')
-  const used = (members.data?.length ?? 0) + pending.length
 
   return (
     <>
       <PageHeader
         title="담당자"
-        description={limit ? `담당자 ${used}/${limit}명 (대기 중인 초대 포함)` : undefined}
         action={isOwner ? <Button onClick={() => setInviteOpen(true)}>번호로 초대</Button> : null}
       />
       <Tabs

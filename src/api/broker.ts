@@ -1,8 +1,9 @@
 import type { DocumentItem, DocumentTypeItem } from './admin'
 import { api, apiBlob, apiForm } from './client'
 
-export type BrokerPlan = 'BASIC' | 'PRO' | 'PRO_PLUS'
-export type BrokerFeature = 'REPORTS' | 'DRIVER_RECORDS' | 'REPORT_EXPORT' | 'API_ACCESS'
+/** 2026-11-14: 베이직·프로 둘만. 담당자 수는 두 플랜 모두 무제한 */
+export type BrokerPlan = 'BASIC' | 'PRO'
+export type BrokerFeature = 'REPORTS' | 'DRIVER_RECORDS'
 export type MemberPosition = 'OWNER' | 'STAFF'
 
 export interface PlanInfo {
@@ -11,8 +12,11 @@ export interface PlanInfo {
   /** 30일 가격(원). 결제는 데모라 고르면 바로 바뀐다 */
   price: number
   features: { code: BrokerFeature; label: string }[]
-  limits: { members: number | null; shareLinksPerMonth: number | null; orderTemplates: number | null }
   startedAt: string | null
+  /** 프로의 지금 30일이 끝나는 때. 베이직이면 null (2026-11-14) */
+  periodEnd: string | null
+  /** 해지함: periodEnd에 베이직으로 내려간다. 아니면 그때 다음 30일을 결제(데모) */
+  cancelAtPeriodEnd: boolean
 }
 
 /** GET /api/brokers/me */

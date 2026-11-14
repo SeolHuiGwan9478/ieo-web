@@ -9,7 +9,7 @@ import { ApiError } from '../api/client'
 import { DOCUMENT_STATUS } from '../admin/documentStatus'
 import { useAuth } from '../auth/AuthContext'
 import { Button, Card, ErrorText, Field, Loading, Modal, PageHeader, SelectField, Tabs, Tag } from '../components/ui'
-import { formatBusinessNumber, formatDateTime, formatWon, todayIso } from '../lib/format'
+import { formatBusinessNumber, formatDate, formatDateTime, formatWon, todayIso } from '../lib/format'
 
 type SettingsTab = 'company' | 'wait' | 'documents' | 'plan'
 const SETTINGS_TABS: { value: SettingsTab; label: string }[] = [
@@ -315,11 +315,10 @@ function WaitPolicyCard({ isOwner }: { isOwner: boolean }) {
   )
 }
 
-/** 30일 가격은 서버 BrokerPlan과 같게 (요금제 12장). 결제는 데모 */
+/** 30일 가격은 서버 BrokerPlan과 같게 (요금제 12장). 결제는 데모. 담당자는 두 플랜 모두 무제한이고 돈은 리포트(와 나중의 에이전트)에만 받는다 (2026-11-14) */
 const PLANS: { code: BrokerPlan; label: string; price: number; items: string[] }[] = [
-  { code: 'BASIC', label: '베이직', price: 0, items: ['담당자 1명', '오더 등록·배차 확정', '운행 위치·ETA, 대기 증빙, 인수증 사진', '신뢰 지표'] },
-  { code: 'PRO', label: '프로', price: 39000, items: ['담당자 10명', '운행 데이터 리포트', '함께 일한 차주 이행 기록', '화주 공유 링크 무제한 (준비 중)'] },
-  { code: 'PRO_PLUS', label: '프로 플러스', price: 99000, items: ['담당자 무제한', '리포트 내려받기 (준비 중)', '외부 API 연동 (준비 중)', '오더 템플릿 무제한 (준비 중)'] },
+  { code: 'BASIC', label: '베이직', price: 0, items: ['담당자 무제한', '오더 등록·배차 확정', '운행 위치·ETA, 대기 증빙, 인수증 사진', '신뢰 지표'] },
+  { code: 'PRO', label: '프로', price: 39000, items: ['베이직의 모든 기능', '운행 데이터 리포트', '함께 일한 차주 이행 기록', '에이전트 (준비 중)'] },
 ]
 
 function PlanCard({ isOwner }: { isOwner: boolean }) {
@@ -334,10 +333,10 @@ function PlanCard({ isOwner }: { isOwner: boolean }) {
     },
     onError: (e) => setError(e instanceof ApiError ? e.message : '서버와 연결할 수 없어요.'),
   })
-  const current = me!.plan.plan
+  const { plan: current, periodEnd, cancelAtPeriodEnd } = me!.plan
   return (
     <Card title="플랜" action={<Tag tone="orange">{me!.plan.planLabel}</Tag>}>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         {PLANS.map((plan) => {
           const active = plan.code === current
           return (
@@ -358,16 +357,32 @@ function PlanCard({ isOwner }: { isOwner: boolean }) {
                   </li>
                 ))}
               </ul>
-              {!active && isOwner ? (
-                <Button variant={plan.price > 0 ? 'primary' : 'secondary'} size="sm" className="mt-auto" loading={changePlan.isPending} onClick={() => changePlan.mutate(plan.code)}>
-                  {plan.price > 0 ? `구독하기 · ${formatWon(plan.price)}` : '베이직으로 내리기'}
-                </Button>
+              {/* 프로는 30일 단위. 해지하면 남은 날까지 쓰고 베이직이 된다 (2026-11-14). 베이직 카드에는 버튼을 두지 않는다 */}
+              {active && plan.price > 0 && periodEnd ? (
+                <p className="mb-3 text-[13px] text-ink-sub">
+                  {cancelAtPeriodEnd ? `해지했어요. ${formatDate(periodEnd)}까지 프로를 쓰고 그 뒤 베이직이 돼요.` : `다음 결제 ${formatDate(periodEnd)} · ${formatWon(plan.price)}`}
+                </p>
+              ) : null}
+              {isOwner && plan.price > 0 ? (
+                !active ? (
+                  <Button size="sm" className="mt-auto" loading={changePlan.isPending} onClick={() => changePlan.mutate(plan.code)}>
+                    {`구독하기 · ${formatWon(plan.price)}`}
+                  </Button>
+                ) : cancelAtPeriodEnd ? (
+                  <Button size="sm" className="mt-auto" loading={changePlan.isPending} onClick={() => changePlan.mutate(plan.code)}>
+                    해지 취소
+                  </Button>
+                ) : (
+                  <Button variant="secondary" size="sm" className="mt-auto" loading={changePlan.isPending} onClick={() => changePlan.mutate('BASIC')}>
+                    해지하기
+                  </Button>
+                )
               ) : null}
             </div>
           )
         })}
       </div>
-      <p className="mt-3 text-[12.5px] text-ink-sub">{isOwner ? '시연용 결제예요. 누르면 바로 결제된 것으로 처리되고 실제 돈은 나가지 않아요. 내려도 담당자와 데이터는 지우지 않아요.' : '플랜은 대표만 바꿀 수 있어요.'}</p>
+      <p className="mt-3 text-[12.5px] text-ink-sub">{isOwner ? '시연용 결제예요. 누르면 바로 결제된 것으로 처리되고 실제 돈은 나가지 않아요. 해지하면 남은 날까지 프로를 쓰고 그 뒤 베이직이 돼요. 담당자와 데이터는 지우지 않아요.' : '플랜은 대표만 바꿀 수 있어요.'}</p>
       <button type="button" onClick={() => setGuideOpen(true)} className="mt-2 text-[13px] font-semibold text-orange-700 hover:underline">
         요금·결제 안내 보기
       </button>
@@ -388,7 +403,7 @@ function PlanCard({ isOwner }: { isOwner: boolean }) {
 
 /** 결제 정책 (요금제 12장 "결제 정책" 표). 정책이 바뀌면 그 표와 같이 고친다. 기사님 무료 체험처럼 주선사와 관계없는 항목은 뺐다 */
 const PLAN_GUIDE: { title: string; body: string }[] = [
-  { title: '플랜과 가격', body: '베이직은 무료, 프로는 30일 39,000원, 프로 플러스는 30일 99,000원이에요. 오더 등록과 배차 확정은 모든 플랜에서 무료이고, 오더나 배차 건마다 받는 요금은 없어요.' },
+  { title: '플랜과 가격', body: '베이직은 무료, 프로는 30일 39,000원이에요. 담당자는 두 플랜 모두 몇 명이든 둘 수 있어요. 오더 등록과 배차 확정은 모든 플랜에서 무료이고, 돈은 운행 데이터 리포트(와 준비 중인 에이전트)에만 받아요. 오더나 배차 건마다 받는 요금은 없어요.' },
   { title: '결제와 자동 갱신', body: '30일 단위로 결제해요. 결제한 날부터 30일 뒤 같은 금액으로 다시 결제하고, 결제 3일 전에 금액과 날짜를 알려 드려요.' },
   { title: '해지', body: '콘솔에서 언제든 바로 해지할 수 있어요. 남은 날까지 쓰고 다음 결제부터 멈춰요. 기간이 끝나기 전에는 해지를 취소할 수 있어요.' },
   { title: '환불', body: '결제 후 7일 안에 유료 기능을 한 번도 쓰지 않았으면 전액 돌려 드려요. 그 뒤에는 돌려 드리지 않고 남은 날까지 쓸 수 있어요.' },
@@ -397,5 +412,5 @@ const PLAN_GUIDE: { title: string; body: string }[] = [
   { title: '늦은 배차 취소', body: '상차 2시간 안에(또는 지난 뒤) 배차를 취소하면 기사님에게 보상으로 프로 3일 쿠폰이 가요.' },
   { title: '가격 변경', body: '30일 전에 알리고 다음 결제부터 적용해요. 이미 낸 기간은 그대로예요.' },
   { title: '영수증', body: '사업자 회원에게는 구독료 세금계산서를 발행해요.' },
-  { title: '지금은 시연용 결제예요', body: '구독하기를 누르면 바로 결제된 것으로 처리되고 실제 돈은 나가지 않아요. 플랜을 바꾸면 바로 적용돼요. 위 정책은 실제 결제를 붙일 때 적용돼요.' },
+  { title: '지금은 시연용 결제예요', body: '구독하기를 누르면 바로 결제된 것으로 처리되고 실제 돈은 나가지 않아요. 프로는 그때부터 30일이고, 기간이 끝나면 다시 결제(시연)돼요. 해지하면 남은 날까지 쓰고 베이직이 돼요. 실제 결제를 붙이면 위 정책이 그대로 적용돼요.' },
 ]
