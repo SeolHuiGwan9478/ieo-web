@@ -183,6 +183,38 @@ export function TextareaField({ label, error, hint, className = '', ...rest }: T
   )
 }
 
+/** 켜고 끄는 설정 하나. 켜면 주황 스위치 */
+export function ToggleField({ title, label, checked, onChange, hint, disabled, className = '' }: {
+  /** 다른 입력칸과 줄을 맞추는 위 제목 */
+  title?: string
+  label: string
+  checked: boolean
+  onChange: (v: boolean) => void
+  hint?: string
+  disabled?: boolean
+  className?: string
+}) {
+  return (
+    <div className={className}>
+      {title ? <span className="mb-1.5 flex items-center gap-1 text-[13px] font-semibold text-ink-mid">{title}</span> : null}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className="flex h-11 w-full items-center justify-between gap-3 rounded-xl border border-line bg-white px-3.5 text-left transition hover:bg-canvas disabled:pointer-events-none disabled:opacity-40"
+      >
+        <span className="text-[14.5px] font-semibold text-ink-strong">{label}</span>
+        <span className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition ${checked ? 'bg-orange-500' : 'bg-line'}`}>
+          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${checked ? 'left-[22px]' : 'left-0.5'}`} />
+        </span>
+      </button>
+      {hint ? <span className="mt-1 block text-[12.5px] text-ink-sub">{hint}</span> : null}
+    </div>
+  )
+}
+
 /** 고를 것이 몇 개 안 될 때 드롭다운 대신 쓰는 칩. 고른 것만 주황 테두리 */
 export function ChipGroup<T extends string>({ label, value, onChange, options, hint, error, required, disabled, className = '' }: {
   label: string

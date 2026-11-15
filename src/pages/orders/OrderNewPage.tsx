@@ -12,7 +12,7 @@ import type { PostcodeResult } from '../../lib/postcode'
 import { BODY_TYPES, CARGO_CATEGORIES, CONFIRM_MODE, CONSIGNMENT, LOADING_METHODS, PAYMENT_TYPES, TONNAGES } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
 import { CompanyVerificationNotice } from '../../components/CompanyVerificationNotice'
-import { Button, Card, ChipGroup, ErrorText, Field, LinkButton, Loading, PageHeader, SelectField } from '../../components/ui'
+import { Button, Card, ChipGroup, ErrorText, Field, LinkButton, Loading, PageHeader, SelectField, ToggleField } from '../../components/ui'
 import { formatDateTime, formatWon, localInputValue } from '../../lib/format'
 
 /**
@@ -772,7 +772,21 @@ export function OrderNewPage({ mode = 'create' }: { mode?: 'create' | 'edit' }) 
                 disabled={locked}
                 {...register('targetDriverId')}
               />
-              <SelectField label="확정 방식" options={Object.entries(CONFIRM_MODE).map(([value, label]) => ({ value, label }))} disabled={locked || Boolean(targetDriverId)} {...register('confirmMode')} />
+              {/* 확정 방식(DSP-005): 끄면 요청한 차주 중에 골라서, 켜면 먼저 요청한 차주로 바로 배차 */}
+              <ToggleField
+                title="배차 방식"
+                label="선착순 자동 배차"
+                checked={!targetDriverId && confirmMode === 'FIRST'}
+                onChange={(on) => setValue('confirmMode', on ? 'FIRST' : 'SELECT', { shouldDirty: true })}
+                disabled={locked || Boolean(targetDriverId)}
+                hint={
+                  targetDriverId
+                    ? '지정 차주 오더는 그 차주가 요청하면 골라서 확정해요.'
+                    : confirmMode === 'FIRST'
+                      ? '켜짐: 가장 먼저 요청한 차주로 바로 배차가 확정돼요.'
+                      : '꺼짐: 요청한 차주들의 기록을 보고 한 명을 골라 확정해요.'
+                }
+              />
               <Field label="거래처 (화주)" placeholder="대한제강" maxLength={50} error={errorOf('customerName')} {...register('customerName')} />
             </div>
           ) : (

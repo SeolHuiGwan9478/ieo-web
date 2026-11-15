@@ -91,4 +91,4 @@ export const TRIP_TONE: Record<TripStatus, 'blue' | 'yellow' | 'green' | 'red' |
 }
 export const WAIT_STATUS: Record<WaitStatus, string> = { WAITING: '대기 중', WORKING: '작업 중', DONE: '이탈' }
 export const CONSIGNMENT: Record<ConsignmentType, string> = { DIRECT: '직접 운송', SUBCONTRACT: '재위탁' }
-export const CONFIRM_MODE: Record<ConfirmMode, string> = { SELECT: '요청 중 골라서 확정', FIRST: '먼저 요청한 차주 자동 확정' }
+export const CONFIRM_MODE: Record<ConfirmMode, string> = { SELECT: '골라서 배차', FIRST: '선착순 자동 배차' }
