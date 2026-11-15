@@ -21,7 +21,7 @@ export interface LandingCopy {
   }
   showcase: { hint: string; tagline: string; off: string; label: string; tabs: { login: string; drive: string; wait: string; offer: string } }
   logos: { label: string; caption: string }
-  /** 카드 여섯 장 묶음. 설명은 실제 기능이고, 경유가 숫자와 배차 요청 줄은 예시다 */
+  /** 카드 여섯 장 묶음. 설명은 실제 기능(TMAP 경로는 2026-11-09 연동)이고, 경유가 숫자와 배차 요청 줄은 예시다 */
   bento: BentoCopy & { title: string; subtitle: string }
   /** 제목은 두 줄(앞줄, 주황 강조 줄), 설명은 문장마다 한 줄로 끊는다 */
   intro: { titleLead: string; titleAccent: string; subtitle: string[]; console: string; note: string }
@@ -66,6 +66,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       pleos: { title: '처음부터 Pleos Connect 위에서', body: '차량 화면에서 바로 돌아가요. 기어와 속도를 읽고, 차량 내비와 음성 안내를 그대로 써요.' },
       hub: { title: '차가 알려 주는 대로 움직여요', body: '달리는 동안엔 음성으로만 알려요. 수락 창은 차가 완전히 섰을 때만 떠요.' },
       hubNodes: { signal: '기어·속도', navi: '차량 내비', voice: '음성 안내' },
+      tmap: { title: '거리와 통행료는 TMAP 화물차 경로로', body: '직선거리가 아니라 화물차가 다니는 길로 거리와 통행료를 계산해요. 추천 상위 5건은 TMAP으로 다시 셈해요.' },
       opinet: { title: '기름값은 오피넷 지역 평균으로', body: '하차지 지역의 경유 평균가로 공차 기름값을 계산해, 운임에서 뺀 실수익을 보여 줘요.' },
       opinetHead: '오늘 경유 평균',
       opinetUnit: '원/L',
@@ -81,7 +82,6 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { route: '인천 남동 → 부산 강서', driver: '박○○ · 11톤 카고' },
       ],
       brokerAction: '확정',
-      ribbon: { title: '배차부터 장부까지 한 앱에서', body: '배차 요청, 대기 타이머, 인수증 사진, 음성 안내, 장부가 한 흐름으로 이어져요.' },
       motion: { title: '운행에서 다음 운행으로', body: '운행이 끝나갈 때 하차지 근처의 다음 오더를 미리 추천해요.' },
     },
     intro: {
@@ -154,6 +154,7 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
       pleos: { title: 'Built on Pleos Connect from day one', body: 'It runs right on the vehicle screen, reading gear and speed and using the car navigation and voice as they are.' },
       hub: { title: 'It follows what the truck tells it', body: 'While you drive it only speaks. The offer appears only once the truck has come to a full stop.' },
       hubNodes: { signal: 'Gear & speed', navi: 'Car navigation', voice: 'Voice' },
+      tmap: { title: 'Distance and tolls from TMAP truck routes', body: 'Not straight lines: roads a truck can actually take, with tolls. The top 5 recommendations are recalculated with TMAP.' },
       opinet: { title: 'Fuel costs from Opinet regional averages', body: "Empty-run fuel is priced at the diesel average around your drop-off, then taken off the fare to show your net." },
       opinetHead: "Today's diesel average",
       opinetUnit: 'KRW/L',
@@ -169,7 +170,6 @@ export const LANDING_COPY: Record<Lang, LandingCopy> = {
         { route: 'Incheon → Busan', driver: 'Park · 11t cargo' },
       ],
       brokerAction: 'Confirm',
-      ribbon: { title: 'From dispatch to ledger in one app', body: 'Dispatch requests, the waiting timer, receipt photos, voice guidance and the ledger follow one flow.' },
       motion: { title: 'From one haul to the next', body: 'As a trip winds down, Ieo recommends the next order around your drop-off ahead of time.' },
     },
     intro: {

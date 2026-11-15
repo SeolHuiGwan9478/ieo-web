@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Clock, Gauge, Navigation, QrCode, ReceiptText, Truck, Volume2 } from 'lucide-react'
+import { Gauge, Navigation, Volume2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Reveal } from '@/components/ui/reveal'
 
@@ -13,6 +13,7 @@ export interface BentoCopy {
   pleos: BentoText
   hub: BentoText
   hubNodes: { signal: string; navi: string; voice: string }
+  tmap: BentoText
   opinet: BentoText
   opinetHead: string
   opinetUnit: string
@@ -22,7 +23,6 @@ export interface BentoCopy {
   broker: BentoText
   brokerRows: { route: string; driver: string }[]
   brokerAction: string
-  ribbon: BentoText
   motion: BentoText
 }
 
@@ -63,29 +63,22 @@ export function BentoFeatures({ copy }: { copy: BentoCopy }) {
           </div>
         </Tile>
 
-        <Tile delayMs={160} text={copy.opinet} titleFirst wide>
-          <div className="mx-5 mt-5 rounded-t-xl bg-background pb-2 text-left ring-1 ring-border">
-            <div className="flex items-center justify-between border-b border-border px-4 py-2.5 text-[13px] text-muted-foreground">
-              <span className="flex items-center gap-2 font-medium text-foreground">
-                <span className="h-2 w-2 rounded-full bg-status-green motion-safe:animate-pulse" aria-hidden="true" />
-                {copy.opinetHead}
-              </span>
-              <span>{copy.opinetUnit}</span>
-            </div>
-            <ul className="px-4 py-1.5 text-[15px]">
-              {copy.opinetRows.map((row) => (
-                <li key={row.region} className="flex items-baseline justify-between py-1.5">
-                  <span>{row.region}</span>
-                  <span className="tabular-nums">
-                    {row.note && <span className="mr-2 text-[13px] font-medium text-status-green">{row.note}</span>}
-                    <b>{row.price}</b>
-                  </span>
-                </li>
-              ))}
-            </ul>
+        <Tile delayMs={160} text={copy.tmap} wide>
+          {/* 고리를 도는 점은 경로를 따라 움직이는 느낌, 가운데는 TMAP 로고 */}
+          <div className="relative flex h-full min-h-[150px] items-center justify-center px-4 pt-6">
+            <svg viewBox="0 0 260 110" className="absolute w-[92%] max-w-[260px] text-border" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <g transform="rotate(-8 130 55)">
+                <ellipse cx="130" cy="55" rx="124" ry="44" />
+                {moving && (
+                  <circle r="5" fill="#FF6C37" stroke="none">
+                    <animateMotion dur="6s" repeatCount="indefinite" path="M6 55a124 44 0 1 0 248 0a124 44 0 1 0-248 0" />
+                  </circle>
+                )}
+              </g>
+            </svg>
+            <img src="/logos/tmap.svg" alt="TMAP MOBILITY" className="relative w-[62%] max-w-[165px]" />
           </div>
         </Tile>
-
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -106,13 +99,26 @@ export function BentoFeatures({ copy }: { copy: BentoCopy }) {
           </div>
         </Tile>
 
-        <Tile delayMs={80} text={copy.ribbon}>
-          <div className="flex h-full min-h-[130px] items-center justify-center gap-[3%] px-5 pt-7" aria-hidden="true">
-            <Chip delayMs={0} className="-rotate-12 translate-y-2 bg-status-blue-bg text-status-blue"><Truck className="h-[45%] w-[45%]" /></Chip>
-            <Chip delayMs={250} className="-rotate-6 bg-status-yellow-bg text-status-yellow"><Clock className="h-[45%] w-[45%]" /></Chip>
-            <Chip delayMs={500} className="bg-orange-500 text-white"><QrCode className="h-[45%] w-[45%]" /></Chip>
-            <Chip delayMs={750} className="rotate-6 bg-status-green-bg text-status-green"><Volume2 className="h-[45%] w-[45%]" /></Chip>
-            <Chip delayMs={1000} className="translate-y-2 rotate-12 bg-foreground text-background"><ReceiptText className="h-[45%] w-[45%]" /></Chip>
+        <Tile delayMs={80} text={copy.opinet} titleFirst>
+          <div className="mx-5 mt-5 rounded-t-xl bg-background pb-2 text-left ring-1 ring-border">
+            <div className="flex items-center justify-between border-b border-border px-4 py-2.5 text-[13px] text-muted-foreground">
+              <span className="flex items-center gap-2 font-medium text-foreground">
+                <span className="h-2 w-2 rounded-full bg-status-green motion-safe:animate-pulse" aria-hidden="true" />
+                {copy.opinetHead}
+              </span>
+              <span>{copy.opinetUnit}</span>
+            </div>
+            <ul className="px-4 py-1.5 text-[15px]">
+              {copy.opinetRows.map((row) => (
+                <li key={row.region} className="flex items-baseline justify-between py-1.5">
+                  <span>{row.region}</span>
+                  <span className="tabular-nums">
+                    {row.note && <span className="mr-2 text-[13px] font-medium text-status-green">{row.note}</span>}
+                    <b>{row.price}</b>
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         </Tile>
 
@@ -167,14 +173,6 @@ function Node({ icon, label, delayMs }: { icon: ReactNode; label: string; delayM
     <span className="flex w-20 flex-col items-center gap-1.5 text-[13px] text-muted-foreground">
       <span className="flex h-14 w-14 items-center justify-center rounded-full bg-foreground text-background motion-safe:animate-bob" style={{ animationDelay: `${delayMs}ms` }}>{icon}</span>
       {label}
-    </span>
-  )
-}
-
-function Chip({ className, delayMs, children }: { className: string; delayMs: number; children: ReactNode }) {
-  return (
-    <span className="aspect-square w-[17%] max-w-16 motion-safe:animate-bob" style={{ animationDelay: `${delayMs}ms` }}>
-      <span className={cn('flex h-full w-full items-center justify-center rounded-2xl', className)}>{children}</span>
     </span>
   )
 }

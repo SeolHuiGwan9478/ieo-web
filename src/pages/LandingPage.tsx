@@ -88,7 +88,7 @@ export function LandingPage({ lang }: { lang: Lang }) {
         </Reveal>
       </section>
 
-      {/* 차 안에서 하는 일: Pleos, 차량 신호, 오피넷, 주선사 콘솔 */}
+      {/* 차 안에서 하는 일: Pleos, 차량 신호, TMAP, 오피넷, 주선사 콘솔 */}
       <section id="brokers" className="scroll-mt-[72px] border-t border-border px-4 py-20 [word-break:keep-all] sm:px-8 sm:py-28">
         <div className="mx-auto max-w-6xl">
           <Reveal>
